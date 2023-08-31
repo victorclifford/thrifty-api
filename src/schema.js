@@ -32,6 +32,12 @@ type User {
     gender: Int
   }
 
+   input ResetPasswordInput {
+    resetCode: String!
+    password: String!
+    userId: String!
+  }
+
   type Query {
     getUsers: String
   }
@@ -42,9 +48,18 @@ type User {
     login(email: String! password: String): AuthPayload!
     userVerification(userId: ID!, verificationCode: String!): AuthPayload!
     requestUserVerification(userId: ID!): AuthPayload!
+    forgetPassword(email: String!): ForgetPasswordPayload!
+    resetPasswordVerification(resetCode: String! userId: ID!): successResponseAlone!
+    resetPassword(resetData: ResetPasswordInput!): successResponseAlone!
   }
 
 # response types here...
+type successResponseAlone {
+    code: Int!
+    success: Boolean!
+    message: String!
+  }
+
  type RegisterPayload {
     code: Int!
     success: Boolean!
@@ -60,6 +75,13 @@ type User {
     code: Int!
     success: Boolean!
     message: String!
+  }
+
+type ForgetPasswordPayload {
+    code: Int!
+    success: Boolean!
+    message: String!
+    userId: String
   }
 
 `;

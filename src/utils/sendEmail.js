@@ -36,6 +36,7 @@ export const sendEmail = (options) => {
       verificationCode: options.verificationCode,
       resetCode: options.resetCode,
       email: options.to,
+      firstname: options.firstname,
     },
   };
 

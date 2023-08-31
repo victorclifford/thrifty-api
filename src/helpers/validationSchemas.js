@@ -24,3 +24,29 @@ export const registerSchema = yup.object().shape({
 export const sixDigitCodeSchema = yup.object().shape({
   code: yup.string().required().min(6).max(6),
 });
+
+export const emailSchema = yup.object().shape({
+  email: yup
+    .string()
+    .email("please provide a valid email")
+    .required("email is required"),
+});
+
+//reset password args Schema
+export const passwordResetSchema = yup.object().shape({
+  resetCode: yup
+    .string()
+    .required("Reset Code is required!")
+    .min(6, "Invalid Reset code!")
+    .max(6, "Invalid Reset Code!"),
+  userId: yup.string().required("User ID is Required"),
+  password: yup
+    .string()
+    .min(6, "password is to weak")
+    .max(30, "password should not exceed 30 characters")
+    .required("password is required")
+    .matches(
+      /^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).*$/,
+      "password must contain at least 1 UpperCase, 1 lowerCase, 1 number and 1 special character"
+    ),
+});

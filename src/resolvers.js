@@ -12,6 +12,8 @@ import {
 import {
   registerSchema,
   sixDigitCodeSchema,
+  emailSchema,
+  passwordResetSchema,
 } from "./helpers/validationSchemas.js";
 
 const resolvers = {
@@ -71,6 +73,7 @@ const resolvers = {
           //send Email containing verification code
           sendEmail({
             to: user.email,
+            firstname: user.firstname.toUpperCase(),
             subject: "Activate Your Thrifty Account",
             verificationCode,
             template: "welcome",
@@ -275,6 +278,7 @@ const resolvers = {
           //send Email containing verification code
           sendEmail({
             to: user.email,
+            firstname: user.firstname.toUpperCase(),
             subject: "Activate Your Thrifty Account",
             verificationCode,
             template: "welcome",
@@ -290,6 +294,192 @@ const resolvers = {
       } catch (error) {
         return {
           code: 500,
+          success: false,
+          message: error.message,
+        };
+      }
+    },
+    forgetPassword: async (root, args, { dataSources }, info) => {
+      try {
+        const { email } = args;
+
+        const user = await dataSources.Users.findUserByEmail(email);
+        // console.log("user-log", customer);
+
+        if (user) {
+          try {
+            //calling generate reserCode method on user Schema
+            const { resetCode } = await user.getResetCode();
+
+            await user.save();
+
+            sendEmail({
+              to: user.email,
+              firstname: user.firstname.toUpperCase(),
+              resetCode,
+              subject: "Password Reset Request",
+              template: "forget-password",
+            });
+
+            return {
+              code: 200,
+              success: true,
+              message:
+                "Cool, A reset code has been sent to your email. Please check your Inbox",
+              userId: user._id,
+            };
+          } catch (error) {
+            return {
+              code: 400,
+              success: false,
+              message: "Unable to send mail",
+            };
+          }
+        } else {
+          return {
+            code: 401,
+            success: false,
+            message:
+              "If your email is correct and registered with Thrifty, you will recieve a mail from us",
+          };
+        }
+      } catch (e) {
+        return {
+          code: 400,
+          success: false,
+          message: "an error occured",
+        };
+      }
+    },
+
+    resetPasswordVerification: async (_, args, { dataSources }) => {
+      try {
+        //validate reset code
+        const { resetCode, userId } = args;
+        try {
+          await sixDigitCodeSchema.validate(
+            { code: resetCode },
+            {
+              abortEarly: true,
+            }
+          );
+        } catch (err) {
+          return {
+            code: 400,
+            success: false,
+            message: err.message,
+          };
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+          return {
+            code: 400,
+            success: false,
+            message: "Invalid User Id!",
+          };
+        }
+        const resetPasswordCode = crypto
+          .createHmac("sha256", config.RESET_SALT)
+          .update(resetCode)
+          .digest("hex");
+
+        //find user by hashed reset code
+        const user = await dataSources.Users.getUserByResetCodeAndId(
+          resetPasswordCode,
+          userId
+        );
+
+        if (!user) {
+          return {
+            code: 400,
+            success: false,
+            message: "Invalid or expired Reset Code",
+          };
+        }
+
+        return {
+          code: 200,
+          success: true,
+          message: "Code verification successful",
+        };
+      } catch (error) {
+        return {
+          code: 500,
+          success: false,
+          message: error.message,
+        };
+      }
+    },
+
+    resetPassword: async (root, { resetData }, { dataSources }, info) => {
+      const { resetCode, password, userId } = resetData;
+      const resetSalt = config.RESET_SALT;
+
+      try {
+        //validating args
+        try {
+          await passwordResetSchema.validate(resetData, {
+            abortEarly: true,
+          });
+          // console.log("validated>>", validatedData);
+        } catch (err) {
+          return {
+            code: 400,
+            success: false,
+            message: err.message,
+          };
+        }
+
+        //validate customerId
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+          return {
+            code: 400,
+            success: false,
+            message: "Invalid User ID!",
+          };
+        }
+
+        const resetPasswordCode = crypto
+          .createHmac("sha256", resetSalt)
+          .update(resetCode)
+          .digest("hex");
+
+        //finding user with the reset code and making sure its not expired
+        const user = await dataSources.Users.getUserByResetCodeAndId(
+          resetPasswordCode,
+          userId
+        );
+        if (!user) {
+          return {
+            code: 400,
+            success: false,
+            message: "Invalid Or Expired Reset Code",
+          };
+        }
+
+        //if all went well, hash password
+        const hashedNewPassword = await bcrypt.hash(password, 10);
+        //update password and discard reset token and expiry
+        user.password = hashedNewPassword;
+        user.resetPasswordExpiration = undefined;
+        user.resetPasswordCode = undefined;
+        await user.save();
+        //send password reset success email
+        sendEmail({
+          to: user.email,
+          firstname: user.firstname.toUpperCase(),
+          subject: "Password Reset Successful",
+          template: "reset-success",
+        });
+        //finally return response
+        return {
+          code: 200,
+          success: true,
+          message: "Great! Your password has been reset Successfully",
+        };
+      } catch (error) {
+        return {
+          code: 400,
           success: false,
           message: error.message,
         };

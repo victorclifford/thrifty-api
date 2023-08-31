@@ -19,11 +19,19 @@ class Users extends MongoDataSource {
     return User.findById(userId);
   }
 
-  getUserByVerificationCodeAndId(verificationCode, userId) {
+  async getUserByVerificationCodeAndId(verificationCode, userId) {
     return User.findOne({
       _id: userId,
       verification_code: verificationCode,
       verificationExpiry: { $gt: Date.now() },
+    });
+  }
+
+  async getUserByResetCodeAndId(code, userId) {
+    return User.findOne({
+      _id: userId,
+      resetPasswordCode: code,
+      resetPasswordExpiration: { $gt: Date.now() },
     });
   }
 }
