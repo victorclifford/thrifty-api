@@ -13,9 +13,15 @@ import { connectDB } from "./src/utils/db.js";
 
 //models
 import User from "./src/models/User.js";
+import Category from "./src/models/Category.js";
+import SubCategory from "./src/models/SubCategory.js";
+import ItemType from "./src/models/ItemType.js";
 
 //datasources
 import Users from "./src/datasource/Users.js";
+import Categories from "./src/datasource/Categories.js";
+import SubCategories from "./src/datasource/SubCategories.js";
+import ItemTypes from "./src/datasource/ItemTypes.js";
 
 dotenv.config();
 const app = express();
@@ -37,6 +43,9 @@ app.use(
       return {
         dataSources: {
           Users: new Users(User),
+          Categories: new Categories(Category),
+          SubCategories: new SubCategories(SubCategory),
+          ItemTypes: new ItemTypes(ItemType),
         },
       };
     },

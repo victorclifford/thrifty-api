@@ -22,6 +22,30 @@ type User {
     createdAt: String!
   }
 
+  type Category {
+    id: ID!
+    name: String!
+    subcategories: [SubCategory]
+    "Timestamp"
+    createdAt: String!
+  }
+
+  type SubCategory {
+    id: ID!
+    name: String!
+    category: Category
+    "Timestamp"
+    createdAt: String!
+  }
+
+   type ItemType {
+    id: ID!
+    name: String!
+    subcategory: SubCategory
+    "Timestamp"
+    createdAt: String!
+  }
+
     # inputs here...
   input RegisterInput {
     firstname: String!
@@ -38,6 +62,12 @@ type User {
     userId: String!
   }
 
+  input ItemTypeInput {
+    categoryId: ID!
+    subcategoryId: ID!
+    name: String!
+  }
+
   type Query {
     getUsers: String
   }
@@ -51,6 +81,9 @@ type User {
     forgetPassword(email: String!): ForgetPasswordPayload!
     resetPasswordVerification(resetCode: String! userId: ID!): successResponseAlone!
     resetPassword(resetData: ResetPasswordInput!): successResponseAlone!
+    createCategory(name: String!): createCategoryResponse!
+    createSubCategory(name: String! categoryId: ID!): createSubCategoryResponse!
+    createItemType(inputData: ItemTypeInput!): createItemTypeResponse!
   }
 
 # response types here...
@@ -82,6 +115,27 @@ type ForgetPasswordPayload {
     success: Boolean!
     message: String!
     userId: String
+  }
+
+  type createCategoryResponse {
+    code: Int!
+    success: Boolean!
+    message: String!
+    category: Category
+  }
+
+    type createSubCategoryResponse {
+    code: Int!
+    success: Boolean!
+    message: String!
+    subCategory: SubCategory
+  }
+
+   type createItemTypeResponse {
+    code: Int!
+    success: Boolean!
+    message: String!
+    itemType: ItemType
   }
 
 `;

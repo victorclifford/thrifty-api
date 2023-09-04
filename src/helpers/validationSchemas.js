@@ -42,11 +42,23 @@ export const passwordResetSchema = yup.object().shape({
   userId: yup.string().required("User ID is Required"),
   password: yup
     .string()
-    .min(6, "password is to weak")
+    .min(6, "password is too weak")
     .max(30, "password should not exceed 30 characters")
     .required("password is required")
     .matches(
       /^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).*$/,
       "password must contain at least 1 UpperCase, 1 lowerCase, 1 number and 1 special character"
     ),
+});
+
+export const addCategorySchema = yup.object().shape({
+  name: yup.string().required().min(3).max(20),
+});
+
+export const addSubCategorySchema = yup.object().shape({
+  name: yup.string().required().min(3).max(30),
+});
+
+export const addItemTypeSchema = yup.object().shape({
+  name: yup.string().required().min(3).max(40),
 });
