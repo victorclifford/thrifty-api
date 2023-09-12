@@ -18,6 +18,10 @@ class Categories extends MongoDataSource {
   async findCategoryById(id) {
     return Category.findById(id);
   }
+
+  async getCategories() {
+    return Category.find({});
+  }
 }
 
 export default Categories;

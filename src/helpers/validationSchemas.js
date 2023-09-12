@@ -25,6 +25,10 @@ export const sixDigitCodeSchema = yup.object().shape({
   code: yup.string().required().min(6).max(6),
 });
 
+export const urlValidator = yup.object().shape({
+  url: yup.string().url(),
+});
+
 export const emailSchema = yup.object().shape({
   email: yup
     .string()
@@ -61,4 +65,30 @@ export const addSubCategorySchema = yup.object().shape({
 
 export const addItemTypeSchema = yup.object().shape({
   name: yup.string().required().min(3).max(40),
+});
+
+export const addItemConditionSchema = yup.object().shape({
+  name: yup.string().required().min(3).max(40),
+  description: yup.string().max(200),
+});
+
+export const addBrandSchema = yup.object().shape({
+  name: yup.string().required().min(3).max(40),
+  description: yup.string().max(250),
+  logo: yup.string().url().required(),
+});
+
+export const addItemSchema = yup.object().shape({
+  name: yup.string().required().min(3).max(100),
+  description: yup.string().required().min(5).max(300),
+  size: yup.string().max(25),
+  color: yup.string().max(25),
+  cover_image: yup.string().url().required(),
+});
+
+export const PriceBreakdownchema = yup.object().shape({
+  total_items_price: yup.number().required().max(100000000),
+  platform_percentage: yup.string().required().max(4),
+  platform_fee: yup.number().required().max(100000000),
+  delivery_fee: yup.number().required().max(10000),
 });

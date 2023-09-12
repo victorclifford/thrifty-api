@@ -14,6 +14,14 @@ class ItemTypes extends MongoDataSource {
   async findItemTypeByName(string) {
     return ItemType.findOne({ name: string });
   }
+
+  async findItemTypeById(id) {
+    return ItemType.findById(id);
+  }
+
+  async findItemTypesBySubCatId(id) {
+    return ItemType.find({ subcategory: id });
+  }
 }
 
 export default ItemTypes;

@@ -17,6 +17,11 @@ import {
   addCategorySchema,
   addSubCategorySchema,
   addItemTypeSchema,
+  addItemConditionSchema,
+  addBrandSchema,
+  addItemSchema,
+  PriceBreakdownchema,
+  urlValidator,
 } from "./helpers/validationSchemas.js";
 
 const resolvers = {
@@ -612,7 +617,7 @@ const resolvers = {
         return {
           code: 201,
           success: true,
-          message: "Category created successfully",
+          message: "SubCategory created successfully",
           subCategory: subcategory,
         };
       } catch (error) {
@@ -712,8 +717,385 @@ const resolvers = {
         return {
           code: 201,
           success: true,
-          message: "Category created successfully",
+          message: "Item type created successfully",
           itemType,
+        };
+      } catch (error) {
+        return {
+          code: 500,
+          success: false,
+          message: error.message,
+        };
+      }
+    },
+
+    createItemCondition: async (_, args, { dataSources }) => {
+      try {
+        //validations
+        try {
+          await addItemConditionSchema.validate(args, { abortEarly: true });
+        } catch (err) {
+          return {
+            code: 400,
+            success: false,
+            message: err.message,
+          };
+        }
+
+        //check if category with the exact same name already exists
+        const conditionExists =
+          await dataSources.ItemConditions.findItemConditionByName(
+            toTitleCase(args.name)
+          );
+
+        if (conditionExists) {
+          return {
+            code: 409,
+            success: false,
+            message:
+              "Another item condition with the same name, already exists!",
+          };
+        }
+
+        //capitalize first letter of every word in condition name
+        args.name = toTitleCase(args.name);
+
+        //create category
+        const itemCondition = await dataSources.ItemConditions.addItemCondition(
+          args
+        );
+        if (!itemCondition) {
+          return {
+            code: 500,
+            success: false,
+            message: "Unable to perform operation at the moment!",
+          };
+        }
+
+        //return success
+        return {
+          code: 201,
+          success: true,
+          message: "Item condition created successfully",
+          itemCondition,
+        };
+      } catch (error) {
+        return {
+          code: 500,
+          success: false,
+          message: error.message,
+        };
+      }
+    },
+
+    createBrand: async (_, { inputData }, { dataSources }) => {
+      try {
+        const { name, description, logo } = inputData;
+        //validations
+        try {
+          await addBrandSchema.validate(inputData, { abortEarly: true });
+        } catch (err) {
+          return {
+            code: 400,
+            success: false,
+            message: err.message,
+          };
+        }
+
+        //check if category with the exact same name already exists
+        const brandExists = await dataSources.Brands.findBrandByName(
+          toTitleCase(name)
+        );
+
+        if (brandExists) {
+          return {
+            code: 409,
+            success: false,
+            message: "Another brand with the exact same name, already exists!",
+          };
+        }
+
+        const data = {
+          name: toTitleCase(name),
+          description,
+          logo,
+        };
+
+        //create category
+        const brand = await dataSources.Brands.addBrand(data);
+        if (!brand) {
+          return {
+            code: 500,
+            success: false,
+            message: "Unable to perform operation at the moment!",
+          };
+        }
+
+        //return success
+        return {
+          code: 201,
+          success: true,
+          message: "Brand created successfully",
+          brand,
+        };
+      } catch (error) {
+        return {
+          code: 500,
+          success: false,
+          message: error.message,
+        };
+      }
+    },
+    addItem: async (_, { inputData }, { dataSources, loggedInUser }) => {
+      try {
+        //check token
+        if (!loggedInUser) {
+          return {
+            code: 401,
+            success: false,
+            message: "Session Expired!",
+            shoutty: null,
+          };
+        }
+
+        console.log({ loggedInUser });
+
+        const {
+          other_snapshots,
+          brand,
+          condition,
+          item_type,
+          quantity_in_stock,
+          price_breakdown,
+        } = inputData;
+        //validations
+
+        if (!mongoose.Types.ObjectId.isValid(condition)) {
+          return {
+            code: 400,
+            success: false,
+            message: "Invalid item condition ID",
+          };
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(item_type)) {
+          return {
+            code: 400,
+            success: false,
+            message: "Invalid item type ID",
+          };
+        }
+
+        //validate qty in stock
+        if (!quantity_in_stock || quantity_in_stock < 1) {
+          return {
+            code: 400,
+            success: false,
+            message:
+              "If this item is not in stock it cannot be uploaded yet. Make sure this item is available, and indicate how many before trying again.",
+          };
+        }
+
+        //validate brand if any
+        if (brand) {
+          if (!mongoose.Types.ObjectId.isValid(brand)) {
+            return {
+              code: 400,
+              success: false,
+              message: "Invalid brand ID",
+            };
+          }
+        }
+
+        try {
+          await addItemSchema.validate(inputData, { abortEarly: true });
+          //   await PriceBreakdownchema.validate(price_breakdown, {
+          //     abortEarly: true,
+          //   });
+
+          //validate other_snapshots if any
+          if (other_snapshots?.length) {
+            for (const url of other_snapshots) {
+              await urlValidator.validate({ url }, { abortEarly: true });
+            }
+          }
+        } catch (err) {
+          return {
+            code: 400,
+            success: false,
+            message: err.message,
+          };
+        }
+
+        //get user
+        const user = await dataSources.Users.findUserById(loggedInUser.id);
+        if (!user) {
+          return {
+            code: 404,
+            success: false,
+            message: "User not found!",
+          };
+        }
+
+        //prepare item data
+        const data = {
+          ...inputData,
+          owner: user._id,
+        };
+
+        //create item
+        const newItem = await dataSources.Items.addItem(data);
+        if (!newItem) {
+          return {
+            code: 500,
+            success: false,
+            message: "Unable to perform operation at the moment!",
+          };
+        }
+
+        //return success
+        return {
+          code: 201,
+          success: true,
+          message: "Item uploaded successfully",
+          item: newItem,
+        };
+      } catch (error) {
+        return {
+          code: 500,
+          success: false,
+          message: error.message,
+        };
+      }
+    },
+
+    createOrder: async (_, { inputData }, { dataSources, loggedInUser }) => {
+      try {
+        //check token
+        if (!loggedInUser) {
+          return {
+            code: 401,
+            success: false,
+            message: "Session Expired!",
+            shoutty: null,
+          };
+        }
+
+        const { items, total_price_paid, price_breakdown } = inputData;
+        //validations
+
+        let itemIds = [];
+
+        try {
+          await PriceBreakdownchema.validate(price_breakdown, {
+            abortEarly: true,
+          });
+
+          //validate other_snapshots if any
+          if (items?.length) {
+            for (const item of items) {
+              if (!mongoose.Types.ObjectId.isValid(item?.item)) {
+                return {
+                  code: 400,
+                  success: false,
+                  message: "Invalid item ID",
+                };
+              }
+            }
+          } else {
+            return {
+              code: 400,
+              success: false,
+              message: "item ID(s) cannot be empty!",
+            };
+          }
+        } catch (err) {
+          return {
+            code: 400,
+            success: false,
+            message: err.message,
+          };
+        }
+
+        //validate payment here...
+        //...........
+
+        //get user
+        const user = await dataSources.Users.findUserById(loggedInUser.id);
+        if (!user) {
+          return {
+            code: 404,
+            success: false,
+            message: "User not found!",
+          };
+        }
+
+        const itemsPurchased = [];
+        //modify qty to be even with stock
+        for (const item of items) {
+          itemIds.push(item.item);
+          const itm = await dataSources.Items.getItem(item.item);
+          if (itm) itemsPurchased.push(itm);
+        }
+
+        for (const item of items) {
+          const itemToModify = itemsPurchased.find(
+            (itm) => itm._id.toString() == item.item.toString()
+          );
+          //check if qty in stock is enough based on qty to be purchased
+          if (
+            itemToModify.quantity_in_stock === 0 ||
+            itemToModify.quantity_in_stock < item.qty
+          ) {
+            return {
+              code: 400,
+              success: false,
+              message: `Qty demanded exceeds qty in stock for item with ID: #${item.item}`,
+            };
+          }
+        }
+
+        //modify qty of item by deducting qty purchased from qty in stock
+        for (const item of items) {
+          const itemToModify = itemsPurchased.find(
+            (itm) => itm._id.toString() == item.item.toString()
+          );
+
+          itemToModify.quantity_in_stock =
+            itemToModify.quantity_in_stock - item.qty;
+          await itemToModify.save();
+        }
+
+        //prepare order data
+        price_breakdown.total_accumulated_price =
+          price_breakdown.total_items_price +
+          price_breakdown.platform_fee +
+          price_breakdown.delivery_fee;
+
+        const data = {
+          owner: user._id,
+          total_price_paid,
+          price_breakdown,
+          items: itemIds,
+          item_quantity: items,
+        };
+
+        //create order
+        const newOrder = await dataSources.Orders.createOrder(data);
+        if (!newOrder) {
+          return {
+            code: 500,
+            success: false,
+            message: "Unable to perform operation at the moment!",
+          };
+        }
+
+        //return success
+        return {
+          code: 201,
+          success: true,
+          message: "Order placed successfully",
+          order: newOrder,
         };
       } catch (error) {
         return {
@@ -726,8 +1108,16 @@ const resolvers = {
   },
   Query: {
     // queries here...
-    async getUsers(_, args, ctx, info) {
-      return "user query called";
+    async getCategories(_, args, { dataSources }, info) {
+      return dataSources.Categories.getCategories();
+    },
+
+    async getItemConditions(_, args, { dataSources }, info) {
+      return dataSources.ItemConditions.getItemConditions();
+    },
+
+    async getBrands(_, args, { dataSources }, info) {
+      return dataSources.Brands.getBrands();
     },
   },
 
@@ -738,13 +1128,35 @@ const resolvers = {
     },
   },
   SubCategory: {
-    category: async ({ category }, args, { dataSources }, info) => {
-      return dataSources.Categories.findCategoryById(category);
+    item_type: async ({ id }, _, { dataSources }, info) => {
+      return dataSources.ItemTypes.findItemTypesBySubCatId(id);
     },
   },
+
   ItemType: {
-    subcategory: async ({ subcategory }, args, { dataSources }, info) => {
-      return dataSources.SubCategories.findSubCategoryById(subcategory);
+    items: async ({ id }, _, { dataSources }, info) => {
+      return dataSources.Items.findItemsByItemTypeId(id);
+    },
+  },
+
+  Item: {
+    condition: async ({ condition }, _, { dataSources }, info) => {
+      return dataSources.ItemConditions.findItemConditionId(condition);
+    },
+    brand: async ({ brand }, _, { dataSources }, info) => {
+      return dataSources.Brands.findBrandById(brand);
+    },
+    owner: async ({ owner }, _, { dataSources }, info) => {
+      return dataSources.Users.findUserById(owner);
+    },
+  },
+
+  Order: {
+    items: async ({ items }, _, { dataSources }, info) => {
+      return dataSources.Items.findListOfItemsById(items);
+    },
+    owner: async ({ owner }, _, { dataSources }, info) => {
+      return dataSources.Users.findUserById(owner);
     },
   },
 };
