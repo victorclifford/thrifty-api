@@ -37,6 +37,18 @@ export const sendEmail = (options) => {
       resetCode: options.resetCode,
       email: options.to,
       firstname: options.firstname,
+      items: options.items,
+      platformFee: options.platformFee,
+      deliveryFee: options.deliveryFee,
+      totalCost: options.totalCost,
+      orderId: options.orderId,
+      sellerCut: options.sellerCut,
+      platformPercentage: options.platformPercentage,
+      streetAddress: options.streetAddress,
+      cityAndZip: options.cityAndZip,
+      suiteNumber: options.suiteNumber,
+      estimatedDeliveryDate: options.estimatedDeliveryDate,
+      estimatedDropoffDate: options.estimatedDropoffDate,
     },
   };
 

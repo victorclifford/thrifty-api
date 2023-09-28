@@ -20,3 +20,7 @@ export function generateRandom4DigitNumber() {
   const max = 9999; // Maximum 4-digit number (inclusive)
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+
+export function calculatePercentage(initialPrice, percentage) {
+  return (initialPrice * percentage) / 100;
+}

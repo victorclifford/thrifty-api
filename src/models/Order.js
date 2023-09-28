@@ -10,6 +10,11 @@ const orderSchema = new Schema(
       type: Number,
       required: true,
     },
+    // stores user the ID of all sellers in the items of an order:helpful when finding seller orders
+    sellers: {
+      type: Array,
+      required: true,
+    },
     item_quantity: [
       {
         item: { type: Schema.ObjectId, ref: "ItemType", required: true },
@@ -40,6 +45,32 @@ const orderSchema = new Schema(
         required: true,
       },
     },
+    delivery_details: {
+      street_address: {
+        type: String,
+        required: true,
+      },
+      apt_or_suite_number: {
+        type: String,
+      },
+      state: {
+        type: String,
+        required: true,
+      },
+      city: {
+        type: String,
+        required: true,
+      },
+      additional_phone_number: {
+        type: String,
+      },
+      special_instructions: {
+        type: String,
+      },
+      zip_code: {
+        type: String,
+      },
+    },
     is_sent_out: {
       type: Number,
       default: 0,
@@ -50,14 +81,31 @@ const orderSchema = new Schema(
     },
     is_accepted: {
       type: Number,
+      default: 0,
+    },
+    accepted_by: {
+      type: String,
+    },
+    is_settled: {
+      type: Number,
+      default: 0,
+    },
+    settlement_reason: {
+      type: String,
     },
     is_rejected: {
       type: Number,
       default: 0,
     },
+    rejection_reason: {
+      type: String,
+    },
     is_refunded: {
       type: Number,
       default: 0,
+    },
+    refund_reason: {
+      type: String,
     },
   },
   { timestamps: true }

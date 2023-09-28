@@ -88,7 +88,20 @@ export const addItemSchema = yup.object().shape({
 
 export const PriceBreakdownchema = yup.object().shape({
   total_items_price: yup.number().required().max(100000000),
-  platform_percentage: yup.string().required().max(4),
-  platform_fee: yup.number().required().max(100000000),
+  // platform_percentage: yup.string().required().max(4),
+  // platform_fee: yup.number().required().max(100000000),
   delivery_fee: yup.number().required().max(10000),
+});
+
+export const DeliveryDetailsSchema = yup.object().shape({
+  street_address: yup.string().required().min(5).max(100),
+  apt_or_suite_number: yup.string().max(30),
+  state: yup.string().required().min(2).max(30),
+  city: yup.string().required().min(2).max(30),
+  zip_code: yup.string().max(10),
+  special_instructions: yup.string().max(170),
+  additional_phone_number: yup
+    .string()
+    .min(6, "Invalid phone number")
+    .max(15, "Invalid phone number"),
 });

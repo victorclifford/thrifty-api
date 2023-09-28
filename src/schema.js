@@ -71,12 +71,28 @@ type User {
   }
 
   type PriceBreakdown {
+    "price of all items orderd for, considering the qty of each, and exclusive of additional costs like delivery fees. (it is important this field is correct and properly crosschecked, because total_accumulated_price, and other values saved, and relyed on are dependent on it.)"
     total_items_price: Float!
     platform_percentage: String!
     platform_fee: Float!
     delivery_fee: Float!
-    "total of all prices of items, inclusive of platform and delivery fees"
+    "total of all prices of items, inclusive of platform and delivery fees if any"
     total_accumulated_price: Float!
+  }
+
+  type DeliveryDetails {
+    "The street name and number where the package will be delivered."
+    street_address: String!
+    "If applicable, especially for apartment buildings or suite numbers.(Optional)"
+    apt_or_suite_number: String
+    "The state or province associated with the city."
+    state: String!
+    "The city where the recipient resides."
+    city: String!
+    additional_phone_number: String
+    "Additional information that may be necessary for delivery, such as specific delivery instructions or landmarks."
+    special_instructions: String
+    zip_code: String
   }
 
   type QuantityBreakdown {
@@ -121,6 +137,7 @@ type User {
     price_breakdown: PriceBreakdown
     "breakdown of the item and qty for every item in the order"
     item_quantity: [QuantityBreakdown]
+    sellers: [ID]!
     # ----- ORDER TRACKING STATUS FIELDS --------- #
     "If items(s) have been sent out to delivery stations"
     is_sent_out: Int
@@ -128,11 +145,18 @@ type User {
     is_recieved: Int
     "If customer accepts item manually, or marked as accepted if time for acceptance has ellapsed"
     is_accepted: Int
+    "if acceptance was triggered by buyer or acceptance time ellapse mechanism"
+    accepted_by: String
     "If there is a problem with item"
     is_rejected: Int
+    rejection_reason: String
     "If refunds for the order has been initiated"
     is_refunded: Int
+    refund_reason: String
     # ---------------------------------------------#
+    is_settled: Int
+    settlement_reason: String
+    delivery_details: DeliveryDetails
     "Timestamp"
     createdAt: String!
   }
@@ -168,9 +192,25 @@ type User {
 
    input PriceBreakdownInput {
     total_items_price: Float!
-    platform_percentage: String!
-    platform_fee: Float!
+    # platform_percentage: String!
+    # platform_fee: Float!
     delivery_fee: Float!
+  }
+
+  input DeliveryDetailsInput {
+    "The street name and number where the package will be delivered."
+    street_address: String!
+    "If applicable, especially for apartment buildings or suite numbers.(Optional)"
+    apt_or_suite_number: String
+    "The state or province associated with the city."
+    state: String!
+    "The city where the recipient resides."
+    city: String!
+    additional_phone_number: String
+    "Additional information that may be necessary for delivery, such as specific delivery instructions or landmarks."
+    special_instructions: String
+    "postal code or zip code"
+    zip_code: String
   }
 
   input ItemQtyInput {
@@ -202,6 +242,7 @@ type User {
     items: [ItemQtyInput]!
     total_price_paid: Float!
     price_breakdown: PriceBreakdownInput
+    delivery_details: DeliveryDetailsInput
   }
 
   type Query {
