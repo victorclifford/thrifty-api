@@ -136,7 +136,7 @@ const resolvers = {
           const token = jwt.sign(
             { id: user._id, email: user.email },
             config.JWT_SECRET,
-            { expiresIn: "1d" }
+            { expiresIn: "3d" }
           );
 
           console.log({ token });
@@ -1095,7 +1095,7 @@ const resolvers = {
           price_breakdown.delivery_fee;
 
         //get all sellers ID
-        const allSellers = itemsPurchased.map(({ owner }) => owner);
+        const allSellers = itemsPurchased.map(({ owner }) => owner.toString());
         // remove duplicate IDs
         const sellersSet = new Set(allSellers);
         //conver set bac to array
@@ -1335,6 +1335,61 @@ const resolvers = {
         };
       }
     },
+    updateTrackingProgress: async (
+      _,
+      { orderId, trackingLevel },
+      { dataSources }
+    ) => {
+      try {
+        //validations
+        if (!mongoose.Types.ObjectId.isValid(orderId)) {
+          return {
+            code: 400,
+            success: false,
+            message: "Invalid order ID!",
+          };
+        }
+
+        const order = await dataSources.Orders.getOrdersById(orderId);
+        if (!order) {
+          return {
+            code: 404,
+            success: false,
+            message: "Order not found",
+          };
+        }
+
+        if (trackingLevel === 1) {
+          order.is_sent_out = 1;
+          await order.save();
+        } else if (trackingLevel === 2) {
+          order.is_delivered = 1;
+          await order.save();
+        } else if (trackingLevel === 3) {
+          order.is_recieved = 1;
+          await order.save();
+        } else {
+          return {
+            code: 400,
+            success: false,
+            message: `Invalid tracking level passed. Recieved: ${trackingLevel}`,
+          };
+        }
+
+        return {
+          success: true,
+          code: 200,
+          message: "Tracking level updated successfully",
+          order,
+        };
+      } catch (error) {
+        return {
+          code: 500,
+          success: false,
+          message: error.message,
+        };
+      }
+    },
   },
   Query: {
     // queries here...
@@ -1348,6 +1403,65 @@ const resolvers = {
 
     async getBrands(_, args, { dataSources }, info) {
       return dataSources.Brands.getBrands();
+    },
+
+    async getOrdersAsBuyer(_, args, { dataSources, loggedInUser }, info) {
+      try {
+        if (!loggedInUser) {
+          return {
+            code: 401,
+            success: false,
+            message: "Session Expired!",
+          };
+        } else {
+          // await dataSources.Orders.deleteAllOrders();
+          const orders = await dataSources.Orders.getOrdersAsBuyer(
+            loggedInUser.id
+          );
+          return {
+            code: 200,
+            success: true,
+            message: "Orders for buyer fetch successful",
+            orders,
+          };
+        }
+      } catch (error) {
+        return {
+          code: 500,
+          success: false,
+          message: "Session Expired!",
+        };
+      }
+    },
+
+    async getOrdersAsSeller(_, args, { dataSources, loggedInUser }, info) {
+      try {
+        if (!loggedInUser) {
+          return {
+            code: 401,
+            success: false,
+            message: "Session Expired!",
+          };
+        } else {
+          const orders = await dataSources.Orders.getOrdersAsSeller(
+            loggedInUser.id
+            // "64ee6f820abbf17eb5e7d733"
+            // "6514050a7230a2fd7f5df3ca"
+          );
+          return {
+            code: 200,
+            success: true,
+            message: "Orders for seller fetch successful",
+            orders,
+          };
+        }
+      } catch (error) {
+        return {
+          code: 500,
+          success: false,
+          message: "Session Expired!",
+        };
+      }
     },
   },
 
@@ -1387,6 +1501,15 @@ const resolvers = {
     },
     owner: async ({ owner }, _, { dataSources }, info) => {
       return dataSources.Users.findUserById(owner);
+    },
+  },
+
+  User: {
+    orders_as_buyer: async ({ id }, _, { dataSources }, info) => {
+      return dataSources.Orders.getOrdersAsBuyer(id.toString());
+    },
+    orders_as_seller: async ({ id }, _, { dataSources }, info) => {
+      return dataSources.Orders.getOrdersAsSeller(id.toString());
     },
   },
 };

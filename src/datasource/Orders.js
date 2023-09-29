@@ -14,6 +14,26 @@ class Orders extends MongoDataSource {
   async getOrders() {
     return Order.find({});
   }
+
+  async getOrdersById(id) {
+    return Order.findById(id);
+  }
+
+  async getOrdersAsBuyer(id) {
+    return Order.find({ owner: id });
+  }
+
+  async deleteAllOrders() {
+    return Order.deleteMany({});
+  }
+
+  async getOrdersAsSeller(id) {
+    try {
+      return Order.find({ sellers: id });
+    } catch (error) {
+      console.log("err-fs::", error);
+    }
+  }
 }
 
 export default Orders;

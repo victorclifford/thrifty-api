@@ -20,6 +20,9 @@ type User {
     resetPasswordExpiration: String
     "Timestamp"
     createdAt: String!
+    # chained fields...
+    orders_as_seller: [Order]
+    orders_as_buyer: [Order]
   }
 
   type Category {
@@ -141,8 +144,11 @@ type User {
     # ----- ORDER TRACKING STATUS FIELDS --------- #
     "If items(s) have been sent out to delivery stations"
     is_sent_out: Int
+    "If transportation of Item(s) has begun by logistics service provider"
+    is_delivered: Int
     "If item has reached the hands of customer (doesn't matter if it's later rejected by customer)"
     is_recieved: Int
+    # ---------------------------------------------#
     "If customer accepts item manually, or marked as accepted if time for acceptance has ellapsed"
     is_accepted: Int
     "if acceptance was triggered by buyer or acceptance time ellapse mechanism"
@@ -152,10 +158,13 @@ type User {
     rejection_reason: String
     "If refunds for the order has been initiated"
     is_refunded: Int
+    "Reason for refund (Optional)"
     refund_reason: String
-    # ---------------------------------------------#
+    "Will be true if order is closed or completed. when Order is settled, no action can be perfomed"
     is_settled: Int
+    "Reason for closing, or completing the order"
     settlement_reason: String
+    "Shipping address of buyer"
     delivery_details: DeliveryDetails
     "Timestamp"
     createdAt: String!
@@ -249,6 +258,8 @@ type User {
     getItemConditions: [ItemCondition]
     getBrands: [Brand]
     getCategories: [Category]
+    getOrdersAsBuyer: orderListResponse!
+    getOrdersAsSeller: orderListResponse!
   }
 
   type Mutation {
@@ -267,6 +278,7 @@ type User {
     createBrand(inputData: AddBrandInput!): createBrandResponse!
     addItem(inputData: AddItemInput): addItemResponse!
     createOrder(inputData: CreateOrderInput!): createOrderResponse!
+    updateTrackingProgress(orderId: ID!, trackingLevel: Int!): orderTrackingProgressResponse!
   }
 
 # response types here...
@@ -347,6 +359,20 @@ type ForgetPasswordPayload {
     success: Boolean!
     message: String!
     order: Order
+  }
+
+  type orderTrackingProgressResponse {
+    code: Int!
+    success: Boolean!
+    message: String!
+    order: Order
+  }
+
+   type orderListResponse {
+    code: Int!
+    success: Boolean!
+    message: String!
+    orders: [Order]
   }
 
 `;
