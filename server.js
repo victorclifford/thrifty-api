@@ -47,7 +47,7 @@ const getUser = (token) => {
     }
     return null;
   } catch (error) {
-    console.log("errVerifyingToken::", error);
+    // console.log("errVerifyingToken::", error);
     return null;
   }
 };

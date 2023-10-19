@@ -11,6 +11,7 @@ import {
 import {
   onUserPurchase,
   creditBeneficiaryPendingBalOnUserPurchase,
+  getUserBalances,
 } from "../library/transactionLibrary.js";
 import {
   slugify,
@@ -18,6 +19,7 @@ import {
   generateRandom4DigitNumber,
   calculatePercentage,
   removeDuplicatesAndSumPrices,
+  getFirst_x_ItemsOfArray,
 } from "../library/utilityFunctionsLibrary.js";
 import {
   registerSchema,
@@ -141,10 +143,10 @@ const resolvers = {
           const token = jwt.sign(
             { id: user._id, email: user.email },
             config.JWT_SECRET,
-            { expiresIn: "3d" }
+            { expiresIn: "5d" }
           );
 
-          console.log({ token });
+          // console.log({ token });
 
           //checking if user is verified
           if (user.isVerified !== 1) {
@@ -1557,7 +1559,7 @@ const resolvers = {
         return {
           code: 500,
           success: false,
-          message: "Session Expired!",
+          message: "Internal server error!",
         };
       }
     },
@@ -1587,7 +1589,73 @@ const resolvers = {
         return {
           code: 500,
           success: false,
-          message: "Session Expired!",
+          message: "Internal server error!",
+        };
+      }
+    },
+    async getUserBalances(_, args, { dataSources, loggedInUser }, info) {
+      try {
+        if (!loggedInUser) {
+          return {
+            code: 401,
+            success: false,
+            message: "Session Expired!",
+          };
+        } else {
+          const { availableBal, pendingBal } = await getUserBalances(
+            dataSources.TransactionRecords,
+            loggedInUser.id
+          );
+
+          const data = {
+            available_balance: availableBal,
+            pending_balance: pendingBal,
+          };
+
+          return {
+            code: 200,
+            success: true,
+            message: "wallet balance fetch successful",
+            wallet: data,
+          };
+        }
+      } catch (error) {
+        console.log({ error });
+        return {
+          code: 500,
+          success: false,
+          message: "Internal server error!",
+        };
+      }
+    },
+    getTnxHistory: async (_, args, { dataSources, loggedInUser }, info) => {
+      try {
+        //check token
+        if (!loggedInUser)
+          return {
+            code: 401,
+            success: false,
+            message: "Session Expired!",
+          };
+
+        const tnxDataSource = dataSources.TransactionRecords;
+        const userHistory = await getUserBalances(
+          tnxDataSource,
+          loggedInUser.id,
+          "history"
+        );
+
+        return {
+          code: 200,
+          success: true,
+          message: "History fetch successful",
+          history: getFirst_x_ItemsOfArray(userHistory, 20),
+        };
+      } catch (error) {
+        return {
+          code: error.code || 500,
+          success: false,
+          message: error.message,
         };
       }
     },
@@ -1638,6 +1706,13 @@ const resolvers = {
     },
     orders_as_seller: async ({ id }, _, { dataSources }, info) => {
       return dataSources.Orders.getOrdersAsSeller(id.toString());
+    },
+    wallet: async ({ id }, _, { dataSources }, info) => {
+      const { availableBal, pendingBal } = await getUserBalances(
+        dataSources.TransactionRecords,
+        id
+      );
+      return { available_balance: availableBal, pending_balance: pendingBal };
     },
   },
 };

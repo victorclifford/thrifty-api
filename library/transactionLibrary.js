@@ -16,6 +16,7 @@ export async function creditUser(args) {
     record_reference,
     status,
     transaction,
+    order,
   } = args;
 
   //get user balances
@@ -45,6 +46,7 @@ export async function creditUser(args) {
     payment_method: pm,
     wallet_type: walletToCredit,
     date: Date.now(),
+    order,
   };
 
   //   console.log({ recordData });
@@ -68,6 +70,7 @@ export async function debitUser(args) {
     status,
     owner_type,
     transaction,
+    order,
   } = args;
 
   let record_reference = ref;
@@ -99,6 +102,7 @@ export async function debitUser(args) {
     wallet_type: walletToDebit,
     status,
     date: Date.now(),
+    order,
   };
 
   const debitWalletRecord = await tnxDataSource.createRecord(recordData);
@@ -265,6 +269,7 @@ export async function creditBeneficiaryPendingBalOnUserPurchase(
     status: 0,
     reference_type: "transction",
     transaction: `Income for sales of items(s)`,
+    order,
   };
 
   const creditedSeller = await creditUser(args);
@@ -295,6 +300,7 @@ export async function creditBeneficiaryPendingBalOnUserPurchase(
     status: 0,
     reference_type: "transction",
     transaction: `Wallet (platform fee ${platform_percentage}%)`,
+    order,
   };
 
   const creditedThrifty = await creditUser(args);

@@ -54,3 +54,7 @@ export function removeDuplicatesAndSumPrices(arr) {
 
   return uniqueArray;
 }
+
+export const getFirst_x_ItemsOfArray = (array, sliceBy) => {
+  return array.slice(0, sliceBy);
+};

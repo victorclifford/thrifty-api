@@ -2,6 +2,11 @@ const typeDefs = `#graphql
 scalar JSON
 
 # custom types here...
+type UserBalances {
+  pending_balance: Float!
+  available_balance: Float!
+}
+
 type User {
     id: ID
     slug: String!
@@ -24,6 +29,7 @@ type User {
     # chained fields...
     orders_as_seller: [Order]
     orders_as_buyer: [Order]
+    wallet: UserBalances!
   }
 
   type Category {
@@ -171,6 +177,23 @@ type User {
     createdAt: String!
   }
 
+  type TransactionRecord {
+    id: ID!
+    owner: ID!,
+    order: ID,
+    transaction: String!,
+    type: String!,
+    amount: Float!,
+    date: String!,
+    payment_method: String!,
+    reference: ID,
+    reference_type: String,
+    wallet_type: Int!,
+    status: Int,
+    available_balance: Float!,
+    pending_balance: Float!,
+  }
+
     # inputs here...
   input RegisterInput {
     firstname: String!
@@ -265,6 +288,8 @@ type User {
     getCategories: [Category]
     getOrdersAsBuyer: orderListResponse!
     getOrdersAsSeller: orderListResponse!
+    getUserBalances: getBalancesResponse!
+    getTnxHistory: getTnxHistoryResponse!
   }
 
   type Mutation {
@@ -291,6 +316,13 @@ type successResponseAlone {
     code: Int!
     success: Boolean!
     message: String!
+  }
+
+  type getBalancesResponse {
+    code: Int!
+    success: Boolean!
+    message: String!
+    wallet: UserBalances
   }
 
  type RegisterPayload {
@@ -378,6 +410,13 @@ type ForgetPasswordPayload {
     success: Boolean!
     message: String!
     orders: [Order]
+  }
+
+  type getTnxHistoryResponse {
+    code: Int!
+    success: Boolean!
+    message: String!
+    history: [TransactionRecord]
   }
 
 `;

@@ -11,7 +11,7 @@ const transactionRecord = new mongoose.Schema(
     payment_method: { type: String, required: true },
     reference: { type: mongoose.Schema.ObjectId },
     reference_type: { type: String },
-    wallet_type: { type: Number },
+    wallet_type: { type: Number, required: true },
     status: { type: Number },
     available_balance: { type: Number, required: true },
     pending_balance: { type: Number, required: true },
