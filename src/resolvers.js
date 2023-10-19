@@ -9,10 +9,15 @@ import {
   dateStringToReadableDate,
 } from "../library/timeLibrary.js";
 import {
+  onUserPurchase,
+  creditBeneficiaryPendingBalOnUserPurchase,
+} from "../library/transactionLibrary.js";
+import {
   slugify,
   toTitleCase,
   generateRandom4DigitNumber,
   calculatePercentage,
+  removeDuplicatesAndSumPrices,
 } from "../library/utilityFunctionsLibrary.js";
 import {
   registerSchema,
@@ -987,8 +992,15 @@ const resolvers = {
           };
         }
 
-        const { items, total_price_paid, price_breakdown, delivery_details } =
-          inputData;
+        const {
+          items,
+          total_price_paid,
+          price_breakdown,
+          delivery_details,
+          payment_method,
+          payment_ref,
+          payment_data,
+        } = inputData;
         //validations
 
         let itemIds = [];
@@ -1028,304 +1040,420 @@ const resolvers = {
           };
         }
 
-        //validate payment here...
-        //...........
-
-        //get user
-        const user = await dataSources.Users.findUserById(loggedInUser.id);
-        if (!user) {
+        //check if payment reference already exists on another order
+        const refExists = await dataSources.Orders.getOrderByPaymentRef(
+          payment_ref
+        );
+        if (refExists) {
           return {
-            code: 404,
+            code: 400,
             success: false,
-            message: "User not found!",
+            message: "An order has already been processed for this payment.",
           };
         }
 
-        const itemsPurchased = [];
-        //modify qty to be even with stock
-        for (const item of items) {
-          itemIds.push(item.item);
-          const itm = await dataSources.Items.getItem(item.item);
-          if (itm) itemsPurchased.push(itm);
-        }
+        //validate payment...
+        if (
+          payment_method.toLowerCase() === "paystack" ||
+          payment_method.toLowerCase() === "flutterwave"
+        ) {
+          let paymentVerified = false;
 
-        for (const item of items) {
-          const itemToModify = itemsPurchased.find(
-            (itm) => itm._id.toString() == item.item.toString()
-          );
-          //check if qty in stock is enough based on qty to be purchased
-          if (
-            itemToModify.quantity_in_stock === 0 ||
-            itemToModify.quantity_in_stock < item.qty
-          ) {
+          //verify payment for paystack
+          if (payment_method.toLowerCase() === "paystack") {
+            console.log("verifying paystack payment...");
+            const verifiedPayment = await dataSources.PaystackAPI.verifyPayment(
+              payment_ref
+            );
+            console.log({ verifiedPayment });
+            if (!verifiedPayment.status && !verifiedPayment.data) {
+              const errorMessage =
+                "Payment verification failed. Please check your payment details and try again. If the issue persists, please contact customer support.";
+
+              return {
+                code: 400,
+                success: false,
+                message: errorMessage,
+              };
+            } else {
+              paymentVerified = true;
+            }
+          }
+
+          //other gateway verifications here....
+          //....
+
+          if (!paymentVerified) {
             return {
               code: 400,
               success: false,
-              message: `Qty demanded exceeds qty in stock for item with ID: #${item.item}`,
+              message: "Payment not recieved!",
             };
-          }
-        }
-
-        //.................................................
-
-        //modify qty of item by deducting qty purchased from qty in stock
-        for (const item of items) {
-          const itemToModify = itemsPurchased.find(
-            (itm) => itm._id.toString() == item.item.toString()
-          );
-
-          itemToModify.quantity_in_stock =
-            itemToModify.quantity_in_stock - item.qty;
-          await itemToModify.save();
-        }
-
-        //prepare order data
-        const platformPercentage = "10%";
-        price_breakdown.platform_percentage = platformPercentage;
-        price_breakdown.platform_fee = calculatePercentage(
-          price_breakdown.total_items_price,
-          platformPercentage.split("%")[0]
-        );
-
-        // console.log({ price_breakdown });
-
-        price_breakdown.total_accumulated_price =
-          price_breakdown.total_items_price +
-          // price_breakdown.platform_fee +
-          price_breakdown.delivery_fee;
-
-        //get all sellers ID
-        const allSellers = itemsPurchased.map(({ owner }) => owner.toString());
-        // remove duplicate IDs
-        const sellersSet = new Set(allSellers);
-        //conver set bac to array
-        const uniqueSellers = Array.from(sellersSet);
-
-        const data = {
-          owner: user._id,
-          total_price_paid,
-          price_breakdown,
-          items: itemIds,
-          item_quantity: items,
-          sellers: uniqueSellers,
-          delivery_details,
-        };
-
-        //create order
-        const newOrder = await dataSources.Orders.createOrder(data);
-        if (!newOrder) {
-          return {
-            code: 500,
-            success: false,
-            message: "Unable to perform operation at the moment!",
-          };
-        }
-
-        //seller mailing...
-        // console.log({ itemsPurchased });
-        //adding seller data on the fly to item object, to be used to get personal details of seller
-        function fetchSellerDetails() {
-          return new Promise(async (resolve, reject) => {
-            try {
-              for (const product of itemsPurchased) {
-                // Find seller by id and append email
-                const seller = await dataSources.Users.findUserById(
-                  product?.owner
-                );
-                // console.log({ seller });
-                if (!seller) {
-                  return reject({
-                    code: 404,
-                    success: false,
-                    message: `Seller not found`,
-                  });
-                }
-
-                product.owner = seller;
-              }
-
-              // All products have been processed successfully
-              resolve(itemsPurchased);
-            } catch (error) {
-              reject(error);
+          } else {
+            //if verified payment, continue with rest of operation...
+            //get user
+            const user = await dataSources.Users.findUserById(loggedInUser.id);
+            if (!user) {
+              return {
+                code: 404,
+                success: false,
+                message: "User not found!",
+              };
             }
-          });
-        }
 
-        const updatedItemsPurchased = await fetchSellerDetails();
-        // console.log({ updatedItemsPurchased });
+            const itemsPurchased = [];
+            let sellersObj = [];
+            //modify qty to be even with stock
+            for (const item of items) {
+              itemIds.push(item.item);
+              const itm = await dataSources.Items.getItem(item.item);
+              if (itm) itemsPurchased.push(itm);
+            }
 
-        //split purchased items into special arrays based on sellerEmail
+            for (const item of items) {
+              const itemToModify = itemsPurchased.find(
+                (itm) => itm._id.toString() == item.item.toString()
+              );
+              //check if qty in stock is enough based on qty to be purchased
+              if (
+                itemToModify.quantity_in_stock === 0 ||
+                itemToModify.quantity_in_stock < item.qty
+              ) {
+                return {
+                  code: 400,
+                  success: false,
+                  message: `Qty demanded exceeds qty in stock for item with ID: #${item.item}`,
+                };
+              }
+            }
 
-        // Use reduce to group products by sellerEmail
-        const itemsBySeller = updatedItemsPurchased.reduce(
-          (result, product) => {
-            // Find an existing group for the sellerEmail
-            const group = result.find(
-              (group) => group[0].owner.email === product.owner.email
+            //.................................................
+
+            //modify qty of item by deducting qty purchased from qty in stock
+            for (const item of items) {
+              const itemToModify = itemsPurchased.find(
+                (itm) => itm._id.toString() == item.item.toString()
+              );
+
+              itemToModify.quantity_in_stock =
+                itemToModify.quantity_in_stock - item.qty;
+              await itemToModify.save();
+            }
+
+            //prepare order data
+            const platformPercentage = "10%";
+            price_breakdown.platform_percentage = platformPercentage;
+            price_breakdown.platform_fee = calculatePercentage(
+              price_breakdown.total_items_price,
+              platformPercentage.split("%")[0]
             );
 
-            if (group) {
-              // Add the product to the existing group
-              group.push(product);
-            } else {
-              // Create a new group with the product
-              result.push([product]);
+            // console.log({ price_breakdown });
+
+            price_breakdown.total_accumulated_price =
+              price_breakdown.total_items_price +
+              // price_breakdown.platform_fee +
+              price_breakdown.delivery_fee;
+
+            //get all sellers ID
+            const allSellers = itemsPurchased.map(({ owner }) =>
+              owner.toString()
+            );
+
+            // remove duplicate IDs
+            const sellersSet = new Set(allSellers);
+            //conver set bac4k to array
+            const uniqueSellers = Array.from(sellersSet);
+
+            const data = {
+              owner: user._id,
+              total_price_paid,
+              price_breakdown,
+              items: itemIds,
+              item_quantity: items,
+              sellers: uniqueSellers,
+              delivery_details,
+              payment_data,
+              payment_method,
+              payment_ref,
+            };
+
+            //create order
+            const newOrder = await dataSources.Orders.createOrder(data);
+            if (!newOrder) {
+              return {
+                code: 500,
+                success: false,
+                message: "Unable to perform operation at the moment!",
+              };
             }
 
-            return result;
-          },
-          []
-        );
+            //seller mailing...
+            // console.log({ itemsPurchased });
+            //adding seller data on the fly to item object, to be used to get personal details of seller
+            function fetchSellerDetails() {
+              return new Promise(async (resolve, reject) => {
+                try {
+                  for (const product of itemsPurchased) {
+                    // Find seller by id and append email
+                    const seller = await dataSources.Users.findUserById(
+                      product?.owner
+                    );
+                    // console.log({ seller });
+                    if (!seller) {
+                      return reject({
+                        code: 404,
+                        success: false,
+                        message: `Seller not found`,
+                      });
+                    }
 
-        const pp = "10%"; //get current platform fee at that time from database instead of static val
+                    product.owner = seller;
+                  }
 
-        //for each seller found, process data for email sending
-        for (const seller of itemsBySeller) {
-          //first sum up the prices of all items to get the seller and platform shares
-          // console.log("seller::", ...seller);
-          const prices = seller.map(({ price }) => parseInt(price));
-          const totalPriceOfItemsForASeller = prices.reduce(
-            (accumulator, currentValue) => {
-              return accumulator + currentValue;
-            },
-            0
-          );
+                  // All products have been processed successfully
+                  resolve(itemsPurchased);
+                } catch (error) {
+                  reject(error);
+                }
+              });
+            }
 
-          const sellerMail = seller.map(({ owner }) => owner.email)[0];
+            const updatedItemsPurchased = await fetchSellerDetails();
+            console.log({ updatedItemsPurchased });
 
-          // console.log({ totalPriceOfItemsForASeller });
+            //split purchased items into special arrays based on sellerEmail
 
-          //calculating platform fee(thrifty cut of shares)
-          let pf = 0;
-
-          //calculating seller cut
-          let sellerCut = 0;
-          let totalPrice = 0; //this will hold the value for price of items before deductions
-
-          //get the qty of the particular item in each iteration and append to seller item
-          function addItmQty() {
-            return new Promise(async (resolve, reject) => {
-              for (const itm of seller) {
-                const itmQty = items.find(
-                  (prod) => prod.item == itm._id.toString()
+            // Use reduce to group products by sellerEmail
+            const itemsBySeller = updatedItemsPurchased.reduce(
+              (result, product) => {
+                // Find an existing group for the sellerEmail
+                const group = result.find(
+                  (group) => group[0].owner.email === product.owner.email
                 );
 
-                let sellerObj = [];
-                const itmObj = itm.toObject();
-                itmObj.temporalQty = itmQty.qty;
-                sellerObj.push(itmObj);
+                if (group) {
+                  // Add the product to the existing group
+                  group.push(product);
+                } else {
+                  // Create a new group with the product
+                  result.push([product]);
+                }
 
-                totalPrice = totalPriceOfItemsForASeller * itmQty.qty;
+                return result;
+              },
+              []
+            );
 
-                pf = calculatePercentage(
-                  totalPriceOfItemsForASeller * itmQty.qty,
-                  pp.split("%")[0]
-                );
+            console.log({ itemsBySeller });
 
-                sellerCut = calculatePercentage(
-                  totalPriceOfItemsForASeller * itmQty.qty,
-                  100 - pp.split("%")[0]
-                );
-                // console.log({ itmObj });
-                resolve(sellerObj);
+            const pp = "10%"; //get current platform fee at that time from database instead of static val
+
+            //create tnx records
+            const tnxInputData = {
+              owner: loggedInUser.id,
+              order: newOrder._id,
+              amount: price_breakdown.total_items_price,
+              platform_percentage: parseInt(pp.split("%")[0]),
+              sellersArray: sellersObj,
+            };
+
+            const tnxDataSources = {
+              orderDataSource: dataSources.Orders,
+              userDataSource: dataSources.Users,
+              tnxDataSource: dataSources.TransactionRecords,
+            };
+
+            const tnxRecords = await onUserPurchase(
+              tnxDataSources,
+              tnxInputData
+            );
+            console.log({ tnxRecords: tnxRecords.completedTransactions });
+
+            //for each seller found, process data for email sending and tnx record
+            for (const seller of itemsBySeller) {
+              //first sum up the prices of all items to get the seller and platform shares
+              // console.log("seller::", ...seller);
+              const prices = seller.map(({ price }) => parseInt(price));
+              const totalPriceOfItemsForASeller = prices.reduce(
+                (accumulator, currentValue) => {
+                  return accumulator + currentValue;
+                },
+                0
+              );
+
+              const sellerMail = seller.map(({ owner }) => owner.email)[0];
+              const sellerId = seller.map(({ owner }) => owner)[0]._id;
+
+              // console.log({ totalPriceOfItemsForASeller });
+
+              //calculating platform fee(thrifty cut of shares)
+              let pf = 0;
+
+              //calculating seller cut
+              let sellerCut = 0;
+              let totalPrice = 0; //this will hold the value for price of items before deductions
+
+              //get the qty of the particular item in each iteration and append to seller item
+              function addItmQty() {
+                return new Promise(async (resolve, reject) => {
+                  for (const itm of seller) {
+                    const itmQty = items.find(
+                      (prod) => prod.item == itm._id.toString()
+                    );
+
+                    let sellerObj = [];
+                    const itmObj = itm.toObject();
+                    itmObj.temporalQty = itmQty.qty;
+                    sellerObj.push(itmObj);
+
+                    let currItemPriceWithQty =
+                      itmObj.price * itmObj.temporalQty;
+
+                    //add the calculated price with qty to the total price for each iteration
+                    totalPrice = totalPrice + currItemPriceWithQty;
+
+                    // totalPrice = totalPriceOfItemsForASeller * itmQty.qty;
+
+                    pf = calculatePercentage(
+                      totalPriceOfItemsForASeller * itmQty.qty,
+                      pp.split("%")[0]
+                    );
+
+                    sellerCut = calculatePercentage(
+                      totalPriceOfItemsForASeller * itmQty.qty,
+                      100 - pp.split("%")[0]
+                    );
+                    // console.log({ itmObj });
+                    resolve(sellerObj);
+                  }
+                });
               }
-            });
-          }
-          const sellerItemsWithQty = await addItmQty();
-          // console.log({ sellerCut });
-          // console.log({ pf });
-          // console.log("seller-itmQTY::", sellerItemsWithQty);
+              const sellerItemsWithQty = await addItmQty();
+              // console.log({ sellerCut });
+              // console.log({ pf });
+              // console.log("seller-itmQTY::", sellerItemsWithQty);
 
-          const estimatedDaysFordropoff = 3;
-          const estimatedDateOfdropoff = addDaysToCurrentDate(
-            estimatedDaysFordropoff
-          );
-          const formattedDropoffDateEstimate = dateStringToReadableDate(
-            estimatedDateOfdropoff
-          );
+              //create transactions to credit beneficiaries of the order
+              const tnxInpData = {
+                sellerId,
+                order: newOrder._id,
+                platform_percentage: parseInt(pp.split("%")[0]),
+                sellerArray: sellerItemsWithQty,
+                ref: tnxRecords.debitReference || null,
+              };
 
-          sendEmail({
-            to: sellerMail,
-            estimatedDropoffDate: formattedDropoffDateEstimate,
-            platformFee: pf.toLocaleString("en-US", {
-              style: "currency",
-              currency: "NGN",
-            }),
-            sellerCut: sellerCut.toLocaleString("en-US", {
-              style: "currency",
-              currency: "NGN",
-            }),
-            // firstname: user.firstname.toUpperCase(),
-            subject: "You Have Recieved A New Order",
-            items: sellerItemsWithQty,
-            orderId: newOrder._id,
-            totalCost: totalPrice,
-            platformPercentage: pp,
-            template: "order-sent-for-seller",
-          });
-        }
+              const SellerTnxRec =
+                await creditBeneficiaryPendingBalOnUserPurchase(
+                  tnxDataSources,
+                  tnxInpData
+                );
 
-        //prepare email data and send email
-        let itemData = [];
-        for (const item of items) {
-          const itm = await dataSources.Items.getItem(item.item);
-          // console.log("itmID::", item.item);
-          // console.log("itm::", itm);
-          itemData.push({
-            itemName: itm.name,
-            itemQty: item.qty,
-            itemPrice: itm.price.toLocaleString("en-US", {
-              style: "currency",
-              currency: "NGN",
-            }),
-          });
-        }
+              console.log("sellerTnxRec::", SellerTnxRec);
 
-        const estimatedDaysForDelivery = 7;
-        const estimatedDateOfDelivery = addDaysToCurrentDate(
-          estimatedDaysForDelivery
-        );
-        const formattedDeliveryDateEstimate = dateStringToReadableDate(
-          estimatedDateOfDelivery
-        );
+              const estimatedDaysFordropoff = 3;
+              const estimatedDateOfdropoff = addDaysToCurrentDate(
+                estimatedDaysFordropoff
+              );
+              const formattedDropoffDateEstimate = dateStringToReadableDate(
+                estimatedDateOfdropoff
+              );
 
-        //send Email for order placement
-        sendEmail({
-          to: user.email,
-          firstname: user.firstname.toUpperCase(),
-          subject: "Your Order Has Been Sent",
-          items: itemData,
-          orderId: newOrder._id,
-          estimatedDeliveryDate: formattedDeliveryDateEstimate,
-          streetAddress: delivery_details.street_address,
-          suiteNumber: delivery_details.apt_or_suite_number,
-          cityAndZip: `${delivery_details.city}, ${delivery_details.state} ${delivery_details.zip_code}`,
-          totalCost: price_breakdown.total_accumulated_price.toLocaleString(
-            "en-US",
-            {
-              style: "currency",
-              currency: "NGN",
+              sendEmail({
+                to: sellerMail,
+                estimatedDropoffDate: formattedDropoffDateEstimate,
+                platformFee: pf.toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "NGN",
+                }),
+                sellerCut: sellerCut.toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "NGN",
+                }),
+                // firstname: user.firstname.toUpperCase(),
+                subject: "You Have Recieved A New Order",
+                items: sellerItemsWithQty,
+                orderId: newOrder._id,
+                totalCost: totalPrice,
+                platformPercentage: pp,
+                template: "order-sent-for-seller",
+              });
             }
-          ),
-          platformFee: price_breakdown.platform_fee.toLocaleString("en-US", {
-            style: "currency",
-            currency: "NGN",
-          }),
-          deliveryFee: price_breakdown.delivery_fee.toLocaleString("en-US", {
-            style: "currency",
-            currency: "NGN",
-          }),
-          template: "order-confirmed",
-        });
 
-        //return success
-        return {
-          code: 201,
-          success: true,
-          message: "Order placed successfully",
-          order: newOrder,
-        };
+            //prepare email data and send email
+            let itemData = [];
+            for (const item of items) {
+              const itm = await dataSources.Items.getItem(item.item);
+              // console.log("itmID::", item.item);
+              // console.log("itm::", itm);
+              itemData.push({
+                itemName: itm.name,
+                itemQty: item.qty,
+                itemPrice: itm.price.toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "NGN",
+                }),
+              });
+            }
+
+            const estimatedDaysForDelivery = 7;
+            const estimatedDateOfDelivery = addDaysToCurrentDate(
+              estimatedDaysForDelivery
+            );
+            const formattedDeliveryDateEstimate = dateStringToReadableDate(
+              estimatedDateOfDelivery
+            );
+
+            //send Email for order placement
+            sendEmail({
+              to: user.email,
+              firstname: user.firstname.toUpperCase(),
+              subject: "Your Order Has Been Sent",
+              items: itemData,
+              orderId: newOrder._id,
+              estimatedDeliveryDate: formattedDeliveryDateEstimate,
+              streetAddress: delivery_details.street_address,
+              suiteNumber: delivery_details.apt_or_suite_number,
+              cityAndZip: `${delivery_details.city}, ${delivery_details.state} ${delivery_details.zip_code}`,
+              totalCost: price_breakdown.total_accumulated_price.toLocaleString(
+                "en-US",
+                {
+                  style: "currency",
+                  currency: "NGN",
+                }
+              ),
+              platformFee: price_breakdown.platform_fee.toLocaleString(
+                "en-US",
+                {
+                  style: "currency",
+                  currency: "NGN",
+                }
+              ),
+              deliveryFee: price_breakdown.delivery_fee.toLocaleString(
+                "en-US",
+                {
+                  style: "currency",
+                  currency: "NGN",
+                }
+              ),
+              template: "order-confirmed",
+            });
+
+            //return success
+            return {
+              code: 201,
+              success: true,
+              message: "Order placed successfully",
+              order: newOrder,
+            };
+          }
+        } else {
+          return {
+            code: 400,
+            success: false,
+            message: "Invalid payment method",
+          };
+        }
       } catch (error) {
         console.log({ error });
         return {

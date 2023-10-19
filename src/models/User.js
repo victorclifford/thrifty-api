@@ -29,6 +29,10 @@ const UserSchema = new Schema(
     password: {
       type: String,
     },
+    country: {
+      type: String,
+      // required: true,
+    },
     face_id: {
       type: String,
     },

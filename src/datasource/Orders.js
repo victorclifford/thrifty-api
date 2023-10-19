@@ -19,6 +19,12 @@ class Orders extends MongoDataSource {
     return Order.findById(id);
   }
 
+  async getOrderByPaymentRef(ref) {
+    return Order.findOne({
+      payment_ref: ref,
+    });
+  }
+
   async getOrdersAsBuyer(id) {
     return Order.find({ owner: id });
   }

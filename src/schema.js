@@ -10,6 +10,7 @@ type User {
     email: String!
     mobile: String!
     password: String
+    country: String
     face_id: String
     show_face_id: Boolean
     fcm_token: [String]
@@ -177,6 +178,7 @@ type User {
     email: String!
     mobile: String!
     password: String
+    country: String
     gender: Int
   }
 
@@ -252,6 +254,9 @@ type User {
     total_price_paid: Float!
     price_breakdown: PriceBreakdownInput
     delivery_details: DeliveryDetailsInput
+    payment_method: String!
+    payment_ref: String!
+    payment_data: String!
   }
 
   type Query {

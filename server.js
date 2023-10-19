@@ -22,8 +22,10 @@ import ItemCondition from "./src/models/ItemCondition.js";
 import Brand from "./src/models/Brand.js";
 import Item from "./src/models/Item.js";
 import Order from "./src/models/Order.js";
+import TransactionRecord from "./src/models/TransactionRecord.js";
 
 //datasources
+import PaystackAPI from "./src/datasource/Paystack.js";
 import Users from "./src/datasource/Users.js";
 import Categories from "./src/datasource/Categories.js";
 import SubCategories from "./src/datasource/SubCategories.js";
@@ -32,6 +34,7 @@ import ItemConditions from "./src/datasource/ItemConditions.js";
 import Brands from "./src/datasource/Brands.js";
 import Items from "./src/datasource/Items.js";
 import Orders from "./src/datasource/Orders.js";
+import TransactionRecords from "./src/datasource/TransactioRecords.js";
 
 dotenv.config();
 
@@ -76,6 +79,10 @@ app.use(
           Brands: new Brands(Brand),
           Items: new Items(Item),
           Orders: new Orders(Order),
+          TransactionRecords: new TransactionRecords(TransactionRecord),
+
+          //rest dataSources
+          PaystackAPI: new PaystackAPI(),
         },
       };
     },

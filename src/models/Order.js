@@ -114,6 +114,16 @@ const orderSchema = new Schema(
     refund_reason: {
       type: String,
     },
+    //PAYMENTS>>>
+    payment_method: {
+      type: String,
+    },
+    payment_ref: {
+      type: String,
+    },
+    payment_data: {
+      type: String,
+    },
   },
   { timestamps: true }
 );
