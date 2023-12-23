@@ -23,6 +23,7 @@ import Brand from "./src/models/Brand.js";
 import Item from "./src/models/Item.js";
 import Order from "./src/models/Order.js";
 import TransactionRecord from "./src/models/TransactionRecord.js";
+import Discount from "./src/models/Discount.js";
 
 //datasources
 import PaystackAPI from "./src/datasource/Paystack.js";
@@ -35,6 +36,7 @@ import Brands from "./src/datasource/Brands.js";
 import Items from "./src/datasource/Items.js";
 import Orders from "./src/datasource/Orders.js";
 import TransactionRecords from "./src/datasource/TransactioRecords.js";
+import Discounts from "./src/datasource/Discounts.js";
 
 dotenv.config();
 
@@ -55,6 +57,7 @@ const getUser = (token) => {
 const app = express();
 const httpServer = http.createServer(app);
 const server = new ApolloServer({
+  introspection: true,
   typeDefs: typeDefs,
   resolvers: resolvers,
   plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
@@ -80,6 +83,7 @@ app.use(
           Items: new Items(Item),
           Orders: new Orders(Order),
           TransactionRecords: new TransactionRecords(TransactionRecord),
+          Discounts: new Discounts(Discount),
 
           //rest dataSources
           PaystackAPI: new PaystackAPI(),
