@@ -58,6 +58,7 @@ const app = express();
 const httpServer = http.createServer(app);
 const server = new ApolloServer({
   introspection: true,
+  playground: true,
   typeDefs: typeDefs,
   resolvers: resolvers,
   plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
