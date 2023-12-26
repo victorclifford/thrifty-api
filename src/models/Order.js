@@ -124,6 +124,9 @@ const orderSchema = new Schema(
     payment_data: {
       type: String,
     },
+    price_used_breakdown: {
+      type: String,
+    },
   },
   { timestamps: true }
 );

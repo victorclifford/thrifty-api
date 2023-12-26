@@ -35,6 +35,10 @@ const itemSchema = new Schema(
       type: Number,
       required: true,
     },
+    min_offer: {
+      type: Number,
+      required: true,
+    },
     brand: { type: Schema.ObjectId, ref: "Brand" },
     condition: { type: Schema.ObjectId, ref: "ItemCondition" },
 

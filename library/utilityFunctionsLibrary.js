@@ -58,3 +58,35 @@ export function removeDuplicatesAndSumPrices(arr) {
 export const getFirst_x_ItemsOfArray = (array, sliceBy) => {
   return array.slice(0, sliceBy);
 };
+
+export class idGenerator {
+  constructor() {
+    this.usedIDs = null;
+  }
+
+  async generateTrackingID(TrackingIDModel, orderId) {
+    while (true) {
+      const trackingID = `TFY${this.generateRandomID()}`;
+      const isUsed = await TrackingIDModel.findOne({ tracking_id: trackingID });
+
+      if (!isUsed) {
+        await TrackingIDModel.create({
+          tracking_id: trackingID,
+          order: orderId,
+        });
+        return trackingID;
+      }
+      console.log("Tracking ID exists, so generating another...");
+    }
+  }
+
+  generateRandomID() {
+    const characters = "ABCDEFGHIJKLMNPQRSTUVWXYZ123456789"; //excluding 0 and O
+    let trackingID = "";
+    for (let i = 0; i < 5; i++) {
+      const randomIndex = Math.floor(Math.random() * characters.length);
+      trackingID += characters.charAt(randomIndex);
+    }
+    return trackingID;
+  }
+}

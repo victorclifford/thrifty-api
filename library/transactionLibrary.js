@@ -17,6 +17,8 @@ export async function creditUser(args) {
     status,
     transaction,
     order,
+    details,
+    discountPercentageOff,
   } = args;
 
   //get user balances
@@ -47,6 +49,8 @@ export async function creditUser(args) {
     wallet_type: walletToCredit,
     date: Date.now(),
     order,
+    details,
+    discountPercentageOff,
   };
 
   //   console.log({ recordData });
@@ -226,7 +230,15 @@ export async function creditBeneficiaryPendingBalOnUserPurchase(
   datasources,
   inp
 ) {
-  const { order, platform_percentage, sellerArray, ref, sellerId } = inp;
+  const {
+    order,
+    platform_percentage,
+    sellerArray,
+    ref,
+    sellerId,
+    priceUsed,
+    discountPercentageOff,
+  } = inp;
   const { tnxDataSource, orderDataSource, userDataSource } = datasources;
 
   const completedTransactions = [];
@@ -237,10 +249,19 @@ export async function creditBeneficiaryPendingBalOnUserPurchase(
   const adminId = thriftyAdmin._id;
 
   let totalPrice = 0;
-  for (const item of sellerArray) {
-    const currItemPriceWithQty = item.price * item.temporalQty;
-    totalPrice = totalPrice + currItemPriceWithQty;
+  let detailsString = "Sales for ";
+  for (const [index, item] of sellerArray.entries()) {
+    // const currItemPriceWithQty = item.price * item.temporalQty;
+    // totalPrice = totalPrice + currItemPriceWithQty;
+    detailsString += `(${item.temporalQty}) ${item.name}`;
+    if (index < sellerArray.length - 1) {
+      detailsString += ", "; // Add a separator, like a comma
+    } else if (index === sellerArray.length - 2) {
+      detailsString += " and "; // Add "and" for the second-to-last item
+    }
   }
+
+  totalPrice = priceUsed;
 
   const sellerExist = await userDataSource.findUserById(sellerId);
   if (!sellerExist) {
@@ -270,6 +291,8 @@ export async function creditBeneficiaryPendingBalOnUserPurchase(
     reference_type: "transction",
     transaction: `Income for sales of items(s)`,
     order,
+    details: detailsString,
+    discountPercentageOff,
   };
 
   const creditedSeller = await creditUser(args);

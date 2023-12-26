@@ -4,6 +4,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { sendEmail } from "./utils/sendEmail.js";
 import config from "./utils/config.js";
+import TrackingId from "./models/TrackingId.js";
 import {
   addDaysToCurrentDate,
   dateStringToReadableDate,
@@ -20,6 +21,7 @@ import {
   calculatePercentage,
   removeDuplicatesAndSumPrices,
   getFirst_x_ItemsOfArray,
+  idGenerator,
 } from "../library/utilityFunctionsLibrary.js";
 import {
   registerSchema,
@@ -1046,13 +1048,13 @@ const resolvers = {
         const refExists = await dataSources.Orders.getOrderByPaymentRef(
           payment_ref
         );
-        if (refExists) {
-          return {
-            code: 400,
-            success: false,
-            message: "An order has already been processed for this payment.",
-          };
-        }
+        // if (refExists) {
+        //   return {
+        //     code: 400,
+        //     success: false,
+        //     message: "An order has already been processed for this payment.",
+        //   };
+        // }
 
         //validate payment...
         if (
@@ -1190,6 +1192,20 @@ const resolvers = {
               };
             }
 
+            //genarate and save tracking ID
+            const trackingIdGenerator = new idGenerator();
+            const trackingID = await trackingIdGenerator.generateTrackingID(
+              TrackingId,
+              newOrder._id
+            );
+
+            // const dis = await dataSources.Discounts.addDiscount({
+            //   owner: "64ee6f820abbf17eb5e7d733",
+            //   itemQty: 2,
+            //   percentage_off: 5,
+            // });
+            // console.log({ dis });
+
             //seller mailing...
             // console.log({ itemsPurchased });
             //adding seller data on the fly to item object, to be used to get personal details of seller
@@ -1252,13 +1268,6 @@ const resolvers = {
             const pp = "10%"; //get current platform fee at that time from database instead of static val
 
             //create tnx records
-            const tnxInputData = {
-              owner: loggedInUser.id,
-              order: newOrder._id,
-              amount: price_breakdown.total_items_price,
-              platform_percentage: parseInt(pp.split("%")[0]),
-              sellersArray: sellersObj,
-            };
 
             const tnxDataSources = {
               orderDataSource: dataSources.Orders,
@@ -1266,14 +1275,136 @@ const resolvers = {
               tnxDataSource: dataSources.TransactionRecords,
             };
 
+            let priceUsedBreakdown = [];
+
+            //prepare email data and send email
+            let itemData = [];
+            let appliedDiscountForBuyer = 0;
+            let discountPercentageOffForBuyer = ` (-0% off)`;
+            let totalPriceForBuyer = 0;
+            let subTotalPriceForBuyer = 0;
+
+            const buyerItemPrices = itemsPurchased.map(({ price }) => price);
+            for (const item of items) {
+              console.log("item-iteration::", item);
+              let itm = await dataSources.Items.getItem(item.item);
+              itm = itm.toObject();
+              // console.log("itmID::", item.item);
+              console.log("itm::", itm);
+              let priceInUse = itm.price * item.qty;
+              let itmObj = {};
+
+              if (item?.applied_discount) {
+                //get discount
+                const discount = await dataSources.Discounts.getDiscount(
+                  item.applied_discount
+                );
+
+                if (discount) {
+                  if (
+                    buyerItemPrices?.length >= discount.itemQty ||
+                    item.qty >= discount.itemQty
+                  ) {
+                    const percentageOff = discount.percentage_off;
+                    const percentageDiscount = calculatePercentage(
+                      priceInUse,
+                      percentageOff
+                    );
+                    priceInUse = priceInUse - percentageDiscount;
+
+                    //update applied discount with percentage off to be used in itm data for email
+
+                    appliedDiscountForBuyer = `-${percentageDiscount.toLocaleString(
+                      "en-US",
+                      {
+                        style: "currency",
+                        currency: "NGN",
+                      }
+                    )}`;
+                    discountPercentageOffForBuyer = ` (-${percentageOff}% off)`;
+                    itmObj.appliedDiscount = appliedDiscountForBuyer;
+                  }
+                }
+              }
+              subTotalPriceForBuyer = subTotalPriceForBuyer + priceInUse;
+              itemData.push({
+                ...itmObj,
+                itemName: itm.name,
+                itemQty: item.qty,
+                itemPrice: priceInUse.toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "NGN",
+                }),
+                discountPercentageOff: discountPercentageOffForBuyer,
+              });
+            }
+
+            const estimatedDaysForDelivery = 7;
+            const estimatedDateOfDelivery = addDaysToCurrentDate(
+              estimatedDaysForDelivery
+            );
+            const formattedDeliveryDateEstimate = dateStringToReadableDate(
+              estimatedDateOfDelivery
+            );
+
+            totalPriceForBuyer =
+              price_breakdown.delivery_fee + subTotalPriceForBuyer;
+
+            const tnxInputData = {
+              owner: loggedInUser.id,
+              order: newOrder._id,
+              amount: totalPriceForBuyer,
+              platform_percentage: parseInt(pp.split("%")[0]),
+              sellersArray: sellersObj,
+            };
+
             const tnxRecords = await onUserPurchase(
               tnxDataSources,
               tnxInputData
             );
-            console.log({ tnxRecords: tnxRecords.completedTransactions });
+            console.log({
+              tnxRecords: tnxRecords.completedTransactions,
+            });
+
+            //send Email for order placement
+            sendEmail({
+              to: user.email,
+              firstname: user.firstname.toUpperCase(),
+              subject: "Your Order Has Been Sent",
+              items: itemData,
+              orderId: trackingID,
+              estimatedDeliveryDate: formattedDeliveryDateEstimate,
+              streetAddress: delivery_details.street_address,
+              suiteNumber: delivery_details.apt_or_suite_number,
+              cityAndZip: `${delivery_details.city}, ${delivery_details.state} ${delivery_details.zip_code}`,
+              subTotalPrice: subTotalPriceForBuyer.toLocaleString("en-US", {
+                style: "currency",
+                currency: "NGN",
+              }),
+              totalCost: totalPriceForBuyer.toLocaleString("en-US", {
+                style: "currency",
+                currency: "NGN",
+              }),
+              platformFee: price_breakdown.platform_fee.toLocaleString(
+                "en-US",
+                {
+                  style: "currency",
+                  currency: "NGN",
+                }
+              ),
+              deliveryFee: price_breakdown.delivery_fee.toLocaleString(
+                "en-US",
+                {
+                  style: "currency",
+                  currency: "NGN",
+                }
+              ),
+              template: "order-confirmed",
+            });
 
             //for each seller found, process data for email sending and tnx record
             for (const seller of itemsBySeller) {
+              let subTotalPrice = 0; //this will hold the value for price of items before deductions
               //first sum up the prices of all items to get the seller and platform shares
               // console.log("seller::", ...seller);
               const prices = seller.map(({ price }) => parseInt(price));
@@ -1294,7 +1425,10 @@ const resolvers = {
 
               //calculating seller cut
               let sellerCut = 0;
-              let totalPrice = 0; //this will hold the value for price of items before deductions
+              let totalPrice = 0; //will hold the value for price of items including discounts & offers
+              subTotalPrice = totalPriceOfItemsForASeller;
+              let appliedDiscount = 0;
+              let discountPercentageOff = ` (-0% off)`;
 
               //get the qty of the particular item in each iteration and append to seller item
               function addItmQty() {
@@ -1305,28 +1439,86 @@ const resolvers = {
                     );
 
                     let sellerObj = [];
+
                     const itmObj = itm.toObject();
                     itmObj.temporalQty = itmQty.qty;
-                    sellerObj.push(itmObj);
 
+                    //calculate curr item price with quantity and discount or offer if any
                     let currItemPriceWithQty =
                       itmObj.price * itmObj.temporalQty;
+
+                    //set subtotal to be total item price before discounts or deductions
+                    subTotalPrice = currItemPriceWithQty;
+
+                    //check if discount, and modify current item price
+                    if (itmQty.applied_discount) {
+                      //get discount
+                      const discount = await dataSources.Discounts.getDiscount(
+                        itmQty.applied_discount
+                      );
+
+                      if (discount) {
+                        if (
+                          prices?.length >= discount.itemQty ||
+                          itmQty.qty >= discount.itemQty
+                        ) {
+                          const percentageOff = discount.percentage_off;
+                          const percentageDiscount = calculatePercentage(
+                            currItemPriceWithQty,
+                            percentageOff
+                          );
+                          currItemPriceWithQty =
+                            currItemPriceWithQty - percentageDiscount;
+
+                          console.log(
+                            "discounted price::",
+                            currItemPriceWithQty
+                          );
+                          //update applied discount with percentage off to be used in itm data for email
+
+                          appliedDiscount = `-${percentageDiscount.toLocaleString(
+                            "en-US",
+                            {
+                              style: "currency",
+                              currency: "NGN",
+                            }
+                          )}`;
+                          discountPercentageOff = ` (-${percentageOff}% off)`;
+                          itmObj.appliedDiscount = discountPercentageOff;
+                        }
+
+                        priceUsedBreakdown.push({
+                          item: itmObj._id,
+                          agreedPricePerItem: itmObj.price,
+                          qty: itmObj.temporalQty,
+                          total: currItemPriceWithQty,
+                          discount,
+                        });
+                      } else {
+                        priceUsedBreakdown.push({
+                          item: itmObj._id,
+                          agreedPricePerItem: itmObj.price,
+                          qty: itmObj.temporalQty,
+                          total: itmObj.price * itmObj.temporalQty,
+                          discount: null,
+                        });
+                      }
+                    }
 
                     //add the calculated price with qty to the total price for each iteration
                     totalPrice = totalPrice + currItemPriceWithQty;
 
                     // totalPrice = totalPriceOfItemsForASeller * itmQty.qty;
 
-                    pf = calculatePercentage(
-                      totalPriceOfItemsForASeller * itmQty.qty,
-                      pp.split("%")[0]
-                    );
+                    pf = calculatePercentage(totalPrice, pp.split("%")[0]);
 
                     sellerCut = calculatePercentage(
-                      totalPriceOfItemsForASeller * itmQty.qty,
+                      totalPrice,
                       100 - pp.split("%")[0]
                     );
                     // console.log({ itmObj });
+                    sellerObj.push(itmObj);
+
                     resolve(sellerObj);
                   }
                 });
@@ -1343,6 +1535,8 @@ const resolvers = {
                 platform_percentage: parseInt(pp.split("%")[0]),
                 sellerArray: sellerItemsWithQty,
                 ref: tnxRecords.debitReference || null,
+                discountPercentageOff,
+                priceUsed: totalPrice, //will carry current price used. if discounted, or an offer
               };
 
               const SellerTnxRec =
@@ -1364,10 +1558,10 @@ const resolvers = {
               sendEmail({
                 to: sellerMail,
                 estimatedDropoffDate: formattedDropoffDateEstimate,
-                platformFee: pf.toLocaleString("en-US", {
+                platformFee: `-${pf.toLocaleString("en-US", {
                   style: "currency",
                   currency: "NGN",
-                }),
+                })}`,
                 sellerCut: sellerCut.toLocaleString("en-US", {
                   style: "currency",
                   currency: "NGN",
@@ -1375,71 +1569,20 @@ const resolvers = {
                 // firstname: user.firstname.toUpperCase(),
                 subject: "You Have Recieved A New Order",
                 items: sellerItemsWithQty,
-                orderId: newOrder._id,
+                orderId: trackingID,
                 totalCost: totalPrice,
                 platformPercentage: pp,
+                appliedDiscount,
+                subTotalPrice,
+                discountPercentageOff,
                 template: "order-sent-for-seller",
               });
             }
 
-            //prepare email data and send email
-            let itemData = [];
-            for (const item of items) {
-              const itm = await dataSources.Items.getItem(item.item);
-              // console.log("itmID::", item.item);
-              // console.log("itm::", itm);
-              itemData.push({
-                itemName: itm.name,
-                itemQty: item.qty,
-                itemPrice: itm.price.toLocaleString("en-US", {
-                  style: "currency",
-                  currency: "NGN",
-                }),
-              });
-            }
-
-            const estimatedDaysForDelivery = 7;
-            const estimatedDateOfDelivery = addDaysToCurrentDate(
-              estimatedDaysForDelivery
-            );
-            const formattedDeliveryDateEstimate = dateStringToReadableDate(
-              estimatedDateOfDelivery
-            );
-
-            //send Email for order placement
-            sendEmail({
-              to: user.email,
-              firstname: user.firstname.toUpperCase(),
-              subject: "Your Order Has Been Sent",
-              items: itemData,
-              orderId: newOrder._id,
-              estimatedDeliveryDate: formattedDeliveryDateEstimate,
-              streetAddress: delivery_details.street_address,
-              suiteNumber: delivery_details.apt_or_suite_number,
-              cityAndZip: `${delivery_details.city}, ${delivery_details.state} ${delivery_details.zip_code}`,
-              totalCost: price_breakdown.total_accumulated_price.toLocaleString(
-                "en-US",
-                {
-                  style: "currency",
-                  currency: "NGN",
-                }
-              ),
-              platformFee: price_breakdown.platform_fee.toLocaleString(
-                "en-US",
-                {
-                  style: "currency",
-                  currency: "NGN",
-                }
-              ),
-              deliveryFee: price_breakdown.delivery_fee.toLocaleString(
-                "en-US",
-                {
-                  style: "currency",
-                  currency: "NGN",
-                }
-              ),
-              template: "order-confirmed",
-            });
+            //save price Used breakdown
+            console.log("PUB::", priceUsedBreakdown);
+            newOrder.price_used_breakdown = JSON.stringify(priceUsedBreakdown);
+            await newOrder.save();
 
             //return success
             return {

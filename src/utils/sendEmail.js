@@ -49,6 +49,9 @@ export const sendEmail = (options) => {
       suiteNumber: options.suiteNumber,
       estimatedDeliveryDate: options.estimatedDeliveryDate,
       estimatedDropoffDate: options.estimatedDropoffDate,
+      appliedDiscount: options.appliedDiscount,
+      subTotalPrice: options.subTotalPrice,
+      discountPercentageOff: options.discountPercentageOff,
     },
   };
 

@@ -125,6 +125,8 @@ type User {
     other_snapshots: [String!]
     "Total incurred price of item (inclusive of all charges)"
     price: Float!
+    "Minimum amout that can be used to start a price negotiation for the item"
+    min_offer: Float
     quantity_in_stock: Int!
     brand: Brand
     condition: ItemCondition!
@@ -148,6 +150,8 @@ type User {
     "breakdown of the item and qty for every item in the order"
     item_quantity: [QuantityBreakdown]
     sellers: [ID]!
+    "Priced used might differ from price of itm, due to discounts or offers, so the price used for each item will be saved here, including the item ID and qty"
+    price_used_breakdown: String
     # ----- ORDER TRACKING STATUS FIELDS --------- #
     "If items(s) have been sent out to delivery stations"
     is_sent_out: Int
@@ -250,6 +254,7 @@ type User {
   input ItemQtyInput {
     item: ID!
     qty: Int!
+    applied_discount: String
   }
 
   input AddItemInput {

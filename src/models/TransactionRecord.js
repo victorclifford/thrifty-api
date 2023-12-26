@@ -15,6 +15,8 @@ const transactionRecord = new mongoose.Schema(
     status: { type: Number },
     available_balance: { type: Number, required: true },
     pending_balance: { type: Number, required: true },
+    discountPercentageOff: { type: String, default: ` (-0% off)` },
+    details: { type: String, default: `` },
   },
   { timestamps: true }
 );

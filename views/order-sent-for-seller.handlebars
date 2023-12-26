@@ -309,7 +309,8 @@
                                           font-family: arial, 'helvetica neue',
                                             helvetica, sans-serif;
                                         "
-                                      >View in browser</a>
+                                        >View in browser</a
+                                      >
                                     </p>
                                   </td>
                                 </tr>
@@ -566,7 +567,8 @@
                                                       line-height: 22px;
                                                     "
                                                     href="https://viewstripo.email"
-                                                  >Shop</a>
+                                                    >Shop</a
+                                                  >
                                                 </p>
                                               </td>
                                             </tr>
@@ -593,7 +595,7 @@
                                               color: #ffffff;
                                               font-size: 14px;
                                             "
-                                          ><img
+                                            ><img
                                               src="https://mahfde.stripocdn.email/content/guids/CABINET_75694a6fc3c4633b3ee8e3c750851c02/images/77981522050090360.png"
                                               alt
                                               style="
@@ -604,7 +606,7 @@
                                                 -ms-interpolation-mode: bicubic;
                                               "
                                               width="27"
-                                            /></a>
+                                          /></a>
                                         </td>
                                       </tr>
                                     </table>
@@ -715,7 +717,7 @@
                                         color: #ed8e20;
                                         font-size: 16px;
                                       "
-                                    ><img
+                                      ><img
                                         src="https://mahfde.stripocdn.email/content/guids/CABINET_75694a6fc3c4633b3ee8e3c750851c02/images/67611522142640957.png"
                                         alt
                                         style="
@@ -726,7 +728,7 @@
                                           -ms-interpolation-mode: bicubic;
                                         "
                                         width="120"
-                                      /></a>
+                                    /></a>
                                   </td>
                                 </tr>
                                 <tr style="border-collapse: collapse">
@@ -1058,17 +1060,17 @@
                                         </td>
                                       </tr>  -->
                                       {{#each items}}
-                                        <tr style="border-collapse: collapse">
-                                          <td
-                                            style="
+                                      <tr style="border-collapse: collapse">
+                                        <td
+                                          style="
                                             padding: 5px 10px 5px 0;
                                             margin: 0;
                                           "
-                                            width="80%"
-                                            align="left"
-                                          >
-                                            <p
-                                              style="
+                                          width="80%"
+                                          align="left"
+                                        >
+                                          <span
+                                            style="
                                               margin: 0;
                                               -webkit-text-size-adjust: none;
                                               -ms-text-size-adjust: none;
@@ -1078,20 +1080,19 @@
                                                 arial, sans-serif;
                                               line-height: 24px;
                                               color: #333333;
-                                              font-size: 14px;
+                                              font-size: 12px;
                                             "
-                                            >
-                                              {{name}}
-                                              ({{temporalQty}})
-                                            </p>
-                                          </td>
-                                          <td
-                                            style="padding: 5px 0; margin: 0"
-                                            width="20%"
-                                            align="left"
                                           >
-                                            <p
-                                              style="
+                                            {{name}} ({{temporalQty}})
+                                          </span>
+                                        </td>
+                                        <td
+                                          style="padding: 5px 0; margin: 0"
+                                          width="20%"
+                                          align="left"
+                                        >
+                                          <span
+                                            style="
                                               margin: 0;
                                               -webkit-text-size-adjust: none;
                                               -ms-text-size-adjust: none;
@@ -1101,14 +1102,14 @@
                                                 arial, sans-serif;
                                               line-height: 24px;
                                               color: #333333;
-                                              font-size: 14px;
+                                              font-size: 12px;
                                               font-weight: 600;
                                             "
-                                            >
-                                              {{price}}
-                                            </p>
-                                          </td>
-                                        </tr>
+                                          >
+                                            {{price}}
+                                          </span>
+                                        </td>
+                                      </tr>
                                       {{/each}}
                                       <tr style="border-collapse: collapse">
                                         <td
@@ -1119,7 +1120,7 @@
                                           width="80%"
                                           align="left"
                                         >
-                                          <p
+                                          <span
                                             style="
                                               margin: 0;
                                               -webkit-text-size-adjust: none;
@@ -1130,18 +1131,19 @@
                                                 arial, sans-serif;
                                               line-height: 24px;
                                               color: #333333;
-                                              font-size: 14px;
+                                              font-size: 12px;
+                                              font-weight:600;
                                             "
                                           >
-                                            Total
-                                          </p>
+                                            Sub-total
+                                          </span>
                                         </td>
                                         <td
                                           style="padding: 5px 0; margin: 0"
                                           width="20%"
                                           align="left"
                                         >
-                                          <p
+                                          <span
                                             style="
                                               margin: 0;
                                               -webkit-text-size-adjust: none;
@@ -1152,12 +1154,12 @@
                                                 arial, sans-serif;
                                               line-height: 24px;
                                               color: #333333;
-                                              font-size: 14px;
+                                              font-size: 12px;
                                               font-weight:600;
                                             "
                                           >
-                                            {{totalCost}}
-                                          </p>
+                                            {{subTotalPrice}}
+                                          </span>
                                         </td>
                                       </tr>
                                       <tr style="border-collapse: collapse">
@@ -1169,7 +1171,7 @@
                                           width="80%"
                                           align="left"
                                         >
-                                          <p
+                                          <span
                                             style="
                                               margin: 0;
                                               -webkit-text-size-adjust: none;
@@ -1180,18 +1182,137 @@
                                                 arial, sans-serif;
                                               line-height: 24px;
                                               color: #333333;
-                                              font-size: 14px;
+                                              font-size: 12px;
                                             "
                                           >
-                                            Platform fee ({{platformPercentage}})
-                                          </p>
+                                            Automated Discount<span
+                                            style="
+                                              margin: 0;
+                                              -webkit-text-size-adjust: none;
+                                              -ms-text-size-adjust: none;
+                                              mso-line-height-rule: exactly;
+                                              font-family: 'open sans',
+                                                'helvetica neue', helvetica,
+                                                arial, sans-serif;
+                                              line-height: 24px;
+                                              color: #b02d2d;
+                                              font-size: 12px;
+                                            "
+                                          >
+                                            {{discountPercentageOff}}
+                                          </span>
+                                          </span>
                                         </td>
                                         <td
                                           style="padding: 5px 0; margin: 0"
                                           width="20%"
                                           align="left"
                                         >
-                                          <p
+                                          <span
+                                            style="
+                                              margin: 0;
+                                              -webkit-text-size-adjust: none;
+                                              -ms-text-size-adjust: none;
+                                              mso-line-height-rule: exactly;
+                                              font-family: 'open sans',
+                                                'helvetica neue', helvetica,
+                                                arial, sans-serif;
+                                              line-height: 24px;
+                                              color: #b02d2d;
+                                              font-size: 12px;
+                                              font-weight:600;
+                                            "
+                                          >
+                                            {{appliedDiscount}}
+                                          </span>
+                                        </td>
+                                      </tr>
+
+                                      <tr style="border-collapse: collapse">
+                                        <td
+                                          style="
+                                            padding: 5px 10px 5px 0;
+                                            margin: 0;
+                                          "
+                                          width="80%"
+                                          align="left"
+                                        >
+                                          <span
+                                            style="
+                                              margin: 0;
+                                              -webkit-text-size-adjust: none;
+                                              -ms-text-size-adjust: none;
+                                              mso-line-height-rule: exactly;
+                                              font-family: 'open sans',
+                                                'helvetica neue', helvetica,
+                                                arial, sans-serif;
+                                              line-height: 24px;
+                                              color: #333333;
+                                              font-size: 12px;
+                                              font-weight:600;
+                                            "
+                                          >
+                                            Total
+                                          </span>
+                                        </td>
+                                        <td
+                                          style="padding: 5px 0; margin: 0"
+                                          width="20%"
+                                          align="left"
+                                        >
+                                          <span
+                                            style="
+                                              margin: 0;
+                                              -webkit-text-size-adjust: none;
+                                              -ms-text-size-adjust: none;
+                                              mso-line-height-rule: exactly;
+                                              font-family: 'open sans',
+                                                'helvetica neue', helvetica,
+                                                arial, sans-serif;
+                                              line-height: 24px;
+                                              color: #333333;
+                                              font-size: 12px;
+                                              font-weight:600;
+                                            "
+                                          >
+                                            {{totalCost}}
+                                          </span>
+                                        </td>
+                                      </tr>
+
+                                      <tr style="border-collapse: collapse">
+                                        <td
+                                          style="
+                                            padding: 5px 10px 5px 0;
+                                            margin: 0;
+                                          "
+                                          width="80%"
+                                          align="left"
+                                        >
+                                          <span
+                                            style="
+                                              margin: 0;
+                                              -webkit-text-size-adjust: none;
+                                              -ms-text-size-adjust: none;
+                                              mso-line-height-rule: exactly;
+                                              font-family: 'open sans',
+                                                'helvetica neue', helvetica,
+                                                arial, sans-serif;
+                                              line-height: 24px;
+                                              color: #333333;
+                                              font-size: 12px;
+                                            "
+                                          >
+                                            Platform fee
+                                            ({{platformPercentage}})
+                                          </span>
+                                        </td>
+                                        <td
+                                          style="padding: 5px 0; margin: 0"
+                                          width="20%"
+                                          align="left"
+                                        >
+                                          <span
                                             style="
                                               margin: 0;
                                               -webkit-text-size-adjust: none;
@@ -1203,13 +1324,12 @@
                                               line-height: 24px;
                                               /* color: #333333; */
                                               color: #b02d2d;
-                                              font-size: 14px;
+                                              font-size: 12px;
                                               font-weight: 600;
                                             "
                                           >
-
-                                            -{{platformFee}}
-                                          </p>
+                                            {{platformFee}}
+                                          </span>
                                         </td>
                                       </tr>
                                     </table>
@@ -1377,7 +1497,8 @@
                                   border-spacing: 0px;
                                 "
                               >
-                                {{! <tr style="border-collapse: collapse">
+                                {{!
+                                <tr style="border-collapse: collapse">
                                   <td
                                     align="left"
                                     style="
@@ -1399,8 +1520,9 @@
                                       Delivery Address
                                     </h4>
                                   </td>
-                                </tr> }}
-                                {{! <tr style="border-collapse: collapse">
+                                </tr>
+                                }} {{!
+                                <tr style="border-collapse: collapse">
                                   <td
                                     align="left"
                                     style="
@@ -1458,7 +1580,8 @@
                                       Cambridge, MA 02139
                                     </p>
                                   </td>
-                                </tr> }}
+                                </tr>
+                                }}
                               </table>
                             </td>
                           </tr>
@@ -1647,7 +1770,12 @@
                                         color: #ffffff;
                                       "
                                     >
-                                      Note: After dropping off the item(s) at any of our dropoff locations, kindly notify us, by clicking on the "I have sent out the item(s)" button on the order fulfillment page, so we can let your buyer know that you have done your part.
+                                      Note: After dropping off the item(s) at
+                                      any of our dropoff locations, kindly
+                                      notify us, by clicking on the "I have sent
+                                      out the item(s)" button on the order
+                                      fulfillment page, so we can let your buyer
+                                      know that you have done your part.
                                     </h5>
                                   </td>
                                 </tr>
@@ -1673,10 +1801,12 @@
                                         border-radius: 5px;
                                         width: auto;
                                       "
-                                    ><a
+                                      ><a
                                         href="#"
                                         class="es-button"
-                                        {{!-- target="_blank" --}}
+                                        {{!--
+                                        target="_blank"
+                                        --}}
                                         style="
                                           mso-style-priority: 100 !important;
                                           text-decoration: none;
@@ -1700,7 +1830,9 @@
                                           mso-padding-alt: 0;
                                           mso-border-alt: 10px solid #66b3b7;
                                         "
-                                      >You Are Awesome</a></span>
+                                        >You Are Awesome</a
+                                      ></span
+                                    >
                                   </td>
                                 </tr>
                               </table>
@@ -1881,7 +2013,8 @@
                                     >
                                       If you didn't create an account using this
                                       email address, please ignore this email
-                                      or&nbsp;<u><a
+                                      or&nbsp;<u
+                                        ><a
                                           target="_blank"
                                           style="
                                             -webkit-text-size-adjust: none;
@@ -1893,7 +2026,9 @@
                                           "
                                           class="unsubscribe"
                                           href=""
-                                        >unsubscribe</a></u>.
+                                          >unsubscribe</a
+                                        ></u
+                                      >.
                                     </p>
                                   </td>
                                 </tr>
