@@ -1674,6 +1674,10 @@ const resolvers = {
       return dataSources.ItemConditions.getItemConditions();
     },
 
+    async getItemTypes(_, args, { dataSources }, info) {
+      return dataSources.ItemTypes.getItemTypes();
+    },
+
     async getBrands(_, args, { dataSources }, info) {
       return dataSources.Brands.getBrands();
     },

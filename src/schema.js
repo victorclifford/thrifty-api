@@ -291,6 +291,7 @@ type User {
     getItemConditions: [ItemCondition]
     getBrands: [Brand]
     getCategories: [Category]
+    getItemTypes: [ItemType]
     getOrdersAsBuyer: orderListResponse!
     getOrdersAsSeller: orderListResponse!
     getUserBalances: getBalancesResponse!
