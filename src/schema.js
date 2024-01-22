@@ -275,6 +275,8 @@ type User {
     condition: ID!
     "This stores the category, subcategory, and group the item belongs"
     item_type: ID!
+    "The lowest offer that can be made for this item"
+    min_offer: Float!
   }
 
    input CreateOrderInput {
