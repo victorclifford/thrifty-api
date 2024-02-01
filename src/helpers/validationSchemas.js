@@ -93,6 +93,10 @@ export const PriceBreakdownchema = yup.object().shape({
   delivery_fee: yup.number().required().max(10000),
 });
 
+export const SinglePriceBreakdownchema = yup.object().shape({
+  delivery_fee: yup.number().required().max(10000),
+});
+
 export const DeliveryDetailsSchema = yup.object().shape({
   street_address: yup.string().required().min(5).max(100),
   apt_or_suite_number: yup.string().max(30),

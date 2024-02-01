@@ -289,6 +289,24 @@ type User {
     payment_data: String!
   }
 
+  # type SinglOrderPriceBreakdown {
+  #   platform_percentage: String!
+  #   platform_fee: Float
+  #   delivery_fee: Float!
+  # }
+
+  input CreateSingleOrderInput {
+    item: ID!
+    price_paid: Float!
+    qty: Int!
+    delivery_fee: Float!
+    # price_breakdown: SinglOrderPriceBreakdown
+    delivery_details: DeliveryDetailsInput
+    payment_method: String!
+    payment_ref: String!
+    payment_data: String!
+  }
+
   type Query {
     getItemConditions: [ItemCondition]
     getBrands: [Brand]
@@ -316,6 +334,7 @@ type User {
     createBrand(inputData: AddBrandInput!): createBrandResponse!
     addItem(inputData: AddItemInput): addItemResponse!
     createOrder(inputData: CreateOrderInput!): createOrderResponse!
+    createSingleOrder(inputData: CreateSingleOrderInput!): createOrderResponse!
     updateTrackingProgress(orderId: ID!, trackingLevel: Int!): orderTrackingProgressResponse!
   }
 

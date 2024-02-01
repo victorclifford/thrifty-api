@@ -37,6 +37,7 @@ import {
   PriceBreakdownchema,
   urlValidator,
   DeliveryDetailsSchema,
+  SinglePriceBreakdownchema,
 } from "./helpers/validationSchemas.js";
 
 const resolvers = {
@@ -1048,13 +1049,13 @@ const resolvers = {
         const refExists = await dataSources.Orders.getOrderByPaymentRef(
           payment_ref
         );
-        // if (refExists) {
-        //   return {
-        //     code: 400,
-        //     success: false,
-        //     message: "An order has already been processed for this payment.",
-        //   };
-        // }
+        if (refExists) {
+          return {
+            code: 400,
+            success: false,
+            message: "An order has already been processed for this payment.",
+          };
+        }
 
         //validate payment...
         if (
@@ -1608,6 +1609,532 @@ const resolvers = {
         };
       }
     },
+
+    createSingleOrder: async (
+      _,
+      { inputData },
+      { dataSources, loggedInUser }
+    ) => {
+      try {
+        //check token
+        if (!loggedInUser) {
+          return {
+            code: 401,
+            success: false,
+            message: "Session Expired!",
+            shoutty: null,
+          };
+        }
+
+        const {
+          item,
+          price_paid,
+          qty,
+          // price_breakdown,
+          delivery_details,
+          payment_method,
+          payment_ref,
+          payment_data,
+          delivery_fee,
+        } = inputData;
+
+        //validations
+
+        try {
+          // await SinglePriceBreakdownchema.validate(price_breakdown, {
+          //   abortEarly: true,
+          // });
+
+          await DeliveryDetailsSchema.validate(delivery_details, {
+            abortEarly: true,
+          });
+
+          if (!mongoose.Types.ObjectId.isValid(item)) {
+            return {
+              code: 400,
+              success: false,
+              message: "Invalid item ID",
+            };
+          }
+        } catch (err) {
+          return {
+            code: 400,
+            success: false,
+            message: err.message,
+          };
+        }
+
+        //check if payment reference already exists on another order
+        const refExists = await dataSources.Orders.getOrderByPaymentRef(
+          payment_ref
+        );
+        // if (refExists) {
+        //   return {
+        //     code: 400,
+        //     success: false,
+        //     message: "An order has already been processed for this payment.",
+        //   };
+        // }
+
+        //validate payment...
+        if (
+          payment_method.toLowerCase() === "paystack" ||
+          payment_method.toLowerCase() === "flutterwaveeee"
+        ) {
+          let paymentVerified = false;
+
+          //verify payment for paystack
+          if (payment_method.toLowerCase() === "paystack") {
+            console.log("verifying paystack payment...");
+            const verifiedPayment = await dataSources.PaystackAPI.verifyPayment(
+              payment_ref
+            );
+            console.log({ verifiedPayment });
+            if (!verifiedPayment.status && !verifiedPayment.data) {
+              const errorMessage =
+                "Payment verification failed. Please check your payment details and try again. If the issue persists, please contact customer support.";
+
+              return {
+                code: 400,
+                success: false,
+                message: errorMessage,
+              };
+            } else {
+              paymentVerified = true;
+            }
+          }
+
+          //other gateway verifications here....
+          //....
+
+          if (!paymentVerified) {
+            return {
+              code: 400,
+              success: false,
+              message: "Payment not recieved!",
+            };
+          } else {
+            //if verified payment, continue with rest of operation...
+            //get user
+            const user = await dataSources.Users.findUserById(loggedInUser.id);
+            if (!user) {
+              return {
+                code: 404,
+                success: false,
+                message: "User not found!",
+              };
+            }
+
+            const itemToBePurchased = await dataSources.Items.getItem(item);
+            if (!itemToBePurchased) {
+              return {
+                code: 404,
+                success: false,
+                message: "Item Not Found",
+              };
+            }
+
+            //check if qty in stock is enough based on qty to be purchased
+            if (
+              itemToBePurchased.quantity_in_stock === 0 ||
+              itemToBePurchased.quantity_in_stock < qty
+            ) {
+              return {
+                code: 400,
+                success: false,
+                message: `Qty demanded for ${itemToBePurchased.name}, exceeds qty in stock.`,
+              };
+            }
+
+            const price_breakdown = {};
+
+            //prepare order data
+            const platformPercentage = "10%";
+            price_breakdown.platform_percentage = platformPercentage;
+            price_breakdown.platform_fee = calculatePercentage(
+              price_paid,
+              platformPercentage.split("%")[0]
+            );
+
+            // console.log({ price_breakdown });
+
+            price_breakdown.total_accumulated_price =
+              price_paid * qty + delivery_fee;
+            price_breakdown.delivery_fee = delivery_fee;
+            price_breakdown.total_items_price = price_paid * qty;
+
+            const data = {
+              owner: user._id,
+              total_price_paid: price_breakdown.total_accumulated_price,
+              price_breakdown,
+              items: [item],
+              item_quantity: [{ item, qty }],
+              sellers: [itemToBePurchased.owner],
+              delivery_details,
+              payment_data,
+              payment_method,
+              payment_ref,
+            };
+
+            //create order
+            const newOrder = await dataSources.Orders.createOrder(data);
+            if (!newOrder) {
+              return {
+                code: 500,
+                success: false,
+                message: "Unable to perform operation at the moment!",
+              };
+            }
+
+            //genarate and save tracking ID
+            const trackingIdGenerator = new idGenerator();
+            const trackingID = await trackingIdGenerator.generateTrackingID(
+              TrackingId,
+              newOrder._id
+            );
+
+            //seller mailing
+            const itmOwner = await dataSources.Users.findUserById(
+              itemToBePurchased?.owner
+            );
+            // console.log({ seller });
+            if (!itmOwner) {
+              return reject({
+                code: 404,
+                success: false,
+                message: `Seller not found`,
+              });
+            }
+
+            const pp = "10%"; //get current platform fee at that time from database instead of static val
+
+            //create tnx records
+
+            const tnxDataSources = {
+              orderDataSource: dataSources.Orders,
+              userDataSource: dataSources.Users,
+              tnxDataSource: dataSources.TransactionRecords,
+            };
+
+            let priceUsedBreakdown = [];
+
+            //prepare email data and send email
+            let sellersObj = [];
+            let itemData = [];
+            let appliedDiscountForBuyer = 0;
+            let discountPercentageOffForBuyer = ` (-0% off)`;
+            let totalPriceForBuyer = 0;
+            let subTotalPriceForBuyer = 0;
+            let itmObj = {};
+            let priceInUse = price_paid; //will be intial price or offer price if any
+            const percentageDiscount = 0;
+            const percentageOff = 0;
+
+            //update applied discount with percentage off to be used in itm data for email
+
+            appliedDiscountForBuyer = `-${percentageDiscount.toLocaleString(
+              "en-US",
+              {
+                style: "currency",
+                currency: "NGN",
+              }
+            )}`;
+            discountPercentageOffForBuyer = ` (-${percentageOff}% off)`;
+            itmObj.appliedDiscount = appliedDiscountForBuyer;
+
+            subTotalPriceForBuyer = priceInUse * qty + subTotalPriceForBuyer;
+            itemData.push({
+              ...itmObj,
+              itemName: itemToBePurchased.name,
+              itemQty: qty,
+              itemPrice: priceInUse.toLocaleString("en-US", {
+                style: "currency",
+                currency: "NGN",
+              }),
+              discountPercentageOff: discountPercentageOffForBuyer,
+            });
+
+            const estimatedDaysForDelivery = 7;
+            const estimatedDateOfDelivery = addDaysToCurrentDate(
+              estimatedDaysForDelivery
+            );
+            const formattedDeliveryDateEstimate = dateStringToReadableDate(
+              estimatedDateOfDelivery
+            );
+
+            totalPriceForBuyer =
+              price_breakdown.delivery_fee + subTotalPriceForBuyer;
+
+            const tnxInputData = {
+              owner: loggedInUser.id,
+              order: newOrder._id,
+              amount: totalPriceForBuyer,
+              platform_percentage: parseInt(pp.split("%")[0]),
+              sellersArray: sellersObj,
+            };
+
+            const tnxRecords = await onUserPurchase(
+              tnxDataSources,
+              tnxInputData
+            );
+            console.log({
+              tnxRecords: tnxRecords.completedTransactions,
+            });
+
+            //send Email for order placement
+            sendEmail({
+              to: user.email,
+              firstname: user.firstname.toUpperCase(),
+              subject: "Your Order Has Been Sent",
+              items: itemData,
+              orderId: trackingID,
+              estimatedDeliveryDate: formattedDeliveryDateEstimate,
+              streetAddress: delivery_details.street_address,
+              suiteNumber: delivery_details.apt_or_suite_number,
+              cityAndZip: `${delivery_details.city}, ${delivery_details.state} ${delivery_details.zip_code}`,
+              subTotalPrice: subTotalPriceForBuyer.toLocaleString("en-US", {
+                style: "currency",
+                currency: "NGN",
+              }),
+              totalCost: totalPriceForBuyer.toLocaleString("en-US", {
+                style: "currency",
+                currency: "NGN",
+              }),
+              platformFee: price_breakdown.platform_fee.toLocaleString(
+                "en-US",
+                {
+                  style: "currency",
+                  currency: "NGN",
+                }
+              ),
+              deliveryFee: price_breakdown.delivery_fee.toLocaleString(
+                "en-US",
+                {
+                  style: "currency",
+                  currency: "NGN",
+                }
+              ),
+              template: "order-confirmed",
+            });
+
+            //for each seller found, process data for email sending and tnx record
+            const itemsBySeller = [[itemToBePurchased]];
+            for (const seller of itemsBySeller) {
+              let subTotalPrice = 0; //this will hold the value for price of items before deductions
+              //first sum up the prices of all items to get the seller and platform shares
+              // console.log("seller::", ...seller);
+              const prices = seller.map(({ price }) => parseInt(price));
+              const totalPriceOfItemsForASeller = prices.reduce(
+                (accumulator, currentValue) => {
+                  return accumulator + currentValue;
+                },
+                0
+              );
+
+              const sellerMail = seller.map(({ owner }) => owner.email)[0];
+              const sellerId = seller.map(({ owner }) => owner)[0]._id;
+
+              // console.log({ sellerMail });
+
+              // console.log({ totalPriceOfItemsForASeller });
+
+              //calculating platform fee(thrifty cut of shares)
+              let pf = 0;
+
+              //calculating seller cut
+              let sellerCut = 0;
+              let totalPrice = 0; //will hold the value for price of items including discounts & offers
+              subTotalPrice = totalPriceOfItemsForASeller;
+              let appliedDiscount = 0;
+              let discountPercentageOff = ` (-0% off)`;
+
+              //get the qty of the particular item in each iteration and append to seller item
+              function addItmQty() {
+                return new Promise(async (resolve, reject) => {
+                  for (const itm of seller) {
+                    let itmQty = {};
+                    itmQty.qty = qty;
+
+                    let sellerObj = [];
+
+                    const itmObj = itm.toObject();
+                    itmObj.temporalQty = itmQty.qty;
+
+                    //calculate curr item price with quantity and discount or offer if any
+                    let currItemPriceWithQty =
+                      itmObj.price * itmObj.temporalQty;
+
+                    //set subtotal to be total item price before discounts or deductions
+                    subTotalPrice = currItemPriceWithQty;
+
+                    //check if discount, and modify current item price
+                    // if (itmQty.applied_discount) {
+                    //   //get discount
+                    //   const discount = await dataSources.Discounts.getDiscount(
+                    //     itmQty.applied_discount
+                    //   );
+
+                    //   if (discount) {
+                    //     if (
+                    //       prices?.length >= discount.itemQty ||
+                    //       itmQty.qty >= discount.itemQty
+                    //     ) {
+                    //       const percentageOff = discount.percentage_off;
+                    //       const percentageDiscount = calculatePercentage(
+                    //         currItemPriceWithQty,
+                    //         percentageOff
+                    //       );
+                    //       currItemPriceWithQty =
+                    //         currItemPriceWithQty - percentageDiscount;
+
+                    //       console.log("discounted price::", currItemPriceWithQty);
+                    //       //update applied discount with percentage off to be used in itm data for email
+
+                    //       appliedDiscount = `-${percentageDiscount.toLocaleString(
+                    //         "en-US",
+                    //         {
+                    //           style: "currency",
+                    //           currency: "NGN",
+                    //         }
+                    //       )}`;
+                    //       discountPercentageOff = ` (-${percentageOff}% off)`;
+                    //       itmObj.appliedDiscount = discountPercentageOff;
+                    //     }
+
+                    //     priceUsedBreakdown.push({
+                    //       item: itmObj._id,
+                    //       agreedPricePerItem: itmObj.price,
+                    //       qty: itmObj.temporalQty,
+                    //       total: currItemPriceWithQty,
+                    //       discount,
+                    //     });
+                    //   }
+                    //   else
+                    //    {
+                    //     priceUsedBreakdown.push({
+                    //       item: itmObj._id,
+                    //       agreedPricePerItem: itmObj.price,
+                    //       qty: itmObj.temporalQty,
+                    //       total: itmObj.price * itmObj.temporalQty,
+                    //       discount: null,
+                    //     });
+                    //   }
+                    // }
+
+                    priceUsedBreakdown.push({
+                      item: itmObj._id,
+                      agreedPricePerItem: itmObj.price,
+                      qty: itmObj.temporalQty,
+                      total: itmObj.price * itmObj.temporalQty,
+                      discount: null,
+                    });
+
+                    //add the calculated price with qty to the total price for each iteration
+                    totalPrice = totalPrice + currItemPriceWithQty;
+
+                    // totalPrice = totalPriceOfItemsForASeller * itmQty.qty;
+
+                    pf = calculatePercentage(totalPrice, pp.split("%")[0]);
+
+                    sellerCut = calculatePercentage(
+                      totalPrice,
+                      100 - pp.split("%")[0]
+                    );
+                    // console.log({ itmObj });
+                    sellerObj.push(itmObj);
+
+                    resolve(sellerObj);
+                  }
+                });
+              }
+              const sellerItemsWithQty = await addItmQty();
+              // console.log({ sellerCut });
+              // console.log({ pf });
+              // console.log("seller-itmQTY::", sellerItemsWithQty);
+
+              //create transactions to credit beneficiaries of the order
+              const tnxInpData = {
+                sellerId: itmOwner._id,
+                order: newOrder._id,
+                platform_percentage: parseInt(pp.split("%")[0]),
+                sellerArray: sellerItemsWithQty,
+                ref: tnxRecords.debitReference || null,
+                discountPercentageOff,
+                priceUsed: totalPrice, //will carry current price used. if discounted, or an offer
+              };
+
+              const SellerTnxRec =
+                await creditBeneficiaryPendingBalOnUserPurchase(
+                  tnxDataSources,
+                  tnxInpData
+                );
+
+              console.log("sellerTnxRec::", SellerTnxRec);
+
+              const estimatedDaysFordropoff = 3;
+              const estimatedDateOfdropoff = addDaysToCurrentDate(
+                estimatedDaysFordropoff
+              );
+              const formattedDropoffDateEstimate = dateStringToReadableDate(
+                estimatedDateOfdropoff
+              );
+
+              console.log({ seller });
+
+              sendEmail({
+                to: itmOwner.email,
+                estimatedDropoffDate: formattedDropoffDateEstimate,
+                platformFee: `-${pf.toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "NGN",
+                })}`,
+                sellerCut: sellerCut.toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "NGN",
+                }),
+                // firstname: user.firstname.toUpperCase(),
+                subject: "You Have Recieved A New Order",
+                items: sellerItemsWithQty,
+                orderId: trackingID,
+                totalCost: totalPrice,
+                platformPercentage: pp,
+                appliedDiscount,
+                subTotalPrice,
+                discountPercentageOff,
+                template: "order-sent-for-seller",
+              });
+            }
+
+            //save price Used breakdown
+            console.log("PUB::", priceUsedBreakdown);
+            newOrder.price_used_breakdown = JSON.stringify(priceUsedBreakdown);
+            await newOrder.save();
+
+            //return success
+            return {
+              code: 201,
+              success: true,
+              message: "Order placed successfully",
+              order: newOrder,
+            };
+          }
+        } else {
+          return {
+            code: 400,
+            success: false,
+            message: "Invalid payment method",
+          };
+        }
+      } catch (error) {
+        console.log({ error });
+        return {
+          code: 500,
+          success: false,
+          message: error.message,
+        };
+      }
+    },
+
     updateTrackingProgress: async (
       _,
       { orderId, trackingLevel },
